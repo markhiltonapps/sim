@@ -5,3 +5,5 @@ export {
   useChat,
 } from './use-chat'
 export { useMothershipResize } from './use-mothership-resize'
+export type { UseAgentChatReturn, AgentChatMessage } from './use-agent-chat'
+export { useAgentChat } from './use-agent-chat'

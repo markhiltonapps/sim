@@ -1743,6 +1743,12 @@ import {
   outlookSendTool,
 } from '@/tools/outlook'
 import {
+  outlookCalendarCreateTool,
+  outlookCalendarDeleteTool,
+  outlookCalendarListTool,
+  outlookCalendarUpdateTool,
+} from '@/tools/outlook_calendar'
+import {
   pagerdutyAddNoteTool,
   pagerdutyCreateIncidentTool,
   pagerdutyListIncidentsTool,
@@ -4545,6 +4551,10 @@ export const tools: Record<string, ToolConfig> = {
   outlook_mark_unread: outlookMarkUnreadTool,
   outlook_delete: outlookDeleteTool,
   outlook_copy: outlookCopyTool,
+  outlook_calendar_list: outlookCalendarListTool,
+  outlook_calendar_create: outlookCalendarCreateTool,
+  outlook_calendar_update: outlookCalendarUpdateTool,
+  outlook_calendar_delete: outlookCalendarDeleteTool,
   pagerduty_list_incidents: pagerdutyListIncidentsTool,
   pagerduty_create_incident: pagerdutyCreateIncidentTool,
   pagerduty_update_incident: pagerdutyUpdateIncidentTool,

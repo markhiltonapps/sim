@@ -6,6 +6,7 @@ import { AuthType, checkSessionOrInternalAuth } from '@/lib/auth/hybrid'
 import { generateRequestId } from '@/lib/core/utils/request'
 import {
   getCredential,
+  getNangoToken,
   getOAuthToken,
   getServiceAccountToken,
   refreshTokenIfNeeded,
@@ -128,6 +129,27 @@ export async function POST(request: NextRequest) {
     const callerUserId = new URL(request.url).searchParams.get('userId') || undefined
 
     const resolved = await resolveOAuthAccountId(credentialId)
+
+    if (resolved?.credentialType === 'nango' && resolved.credentialId) {
+      const authz = await authorizeCredentialUse(request, {
+        credentialId,
+        workflowId: workflowId ?? undefined,
+        requireWorkflowIdForInternal: false,
+        callerUserId,
+      })
+      if (!authz.ok) {
+        return NextResponse.json({ error: authz.error || 'Unauthorized' }, { status: 403 })
+      }
+
+      try {
+        const accessToken = await getNangoToken(resolved.credentialId)
+        return NextResponse.json({ accessToken }, { status: 200 })
+      } catch (error) {
+        logger.error(`[${requestId}] Nango token error:`, error)
+        return NextResponse.json({ error: 'Failed to get Nango access token' }, { status: 401 })
+      }
+    }
+
     if (resolved?.credentialType === 'service_account' && resolved.credentialId) {
       const authz = await authorizeCredentialUse(request, {
         credentialId,

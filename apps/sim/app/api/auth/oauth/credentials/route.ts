@@ -332,6 +332,36 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Also include Nango-managed credentials for this workspace+provider
+      const nangoCredentialsData = await db
+        .select({
+          id: credential.id,
+          displayName: credential.displayName,
+          providerId: credential.providerId,
+          updatedAt: credential.updatedAt,
+        })
+        .from(credential)
+        .innerJoin(
+          credentialMember,
+          and(
+            eq(credentialMember.credentialId, credential.id),
+            eq(credentialMember.userId, requesterUserId),
+            eq(credentialMember.status, 'active')
+          )
+        )
+        .where(
+          and(
+            eq(credential.workspaceId, effectiveWorkspaceId),
+            eq(credential.type, 'nango'),
+            eq(credential.providerId, providerParam)
+          )
+        )
+
+      for (const row of nangoCredentialsData) {
+        if (!row.providerId) continue
+        results.push(toCredentialResponse(row.id, row.displayName, row.providerId, row.updatedAt, null))
+      }
+
       return NextResponse.json({ credentials: results }, { status: 200 })
     }
 

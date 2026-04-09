@@ -4,6 +4,8 @@ import { account, credential, credentialSetMember } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { decryptSecret } from '@/lib/core/security/encryption'
+import { getNangoClient } from '@/lib/nango/client'
+import { getNangoProviderConfigKey } from '@/lib/nango/providers'
 import { refreshOAuthToken } from '@/lib/oauth'
 import {
   getMicrosoftRefreshTokenExpiry,
@@ -71,6 +73,16 @@ export async function resolveOAuthAccountId(
         accountId: '',
         credentialId: credentialRow.id,
         credentialType: 'service_account',
+        workspaceId: credentialRow.workspaceId,
+        usedCredentialTable: true,
+      }
+    }
+
+    if (credentialRow.type === 'nango') {
+      return {
+        accountId: '',
+        credentialId: credentialRow.id,
+        credentialType: 'nango',
         workspaceId: credentialRow.workspaceId,
         usedCredentialTable: true,
       }
@@ -205,6 +217,51 @@ export async function getServiceAccountToken(
 
   const tokenData = (await response.json()) as { access_token: string }
   return tokenData.access_token
+}
+
+/**
+ * Retrieves a fresh access token for a Nango-managed credential.
+ */
+export async function getNangoToken(credentialId: string): Promise<string> {
+  const [credentialRow] = await db
+    .select({
+      providerId: credential.providerId,
+      nangoConnectionId: credential.nangoConnectionId,
+    })
+    .from(credential)
+    .where(eq(credential.id, credentialId))
+    .limit(1)
+
+  if (!credentialRow?.providerId || !credentialRow?.nangoConnectionId) {
+    throw new Error('Nango credential not found or missing connection info')
+  }
+
+  const nangoClient = getNangoClient()
+  if (!nangoClient) {
+    throw new Error('Nango is not configured')
+  }
+
+  const providerConfigKey = getNangoProviderConfigKey(credentialRow.providerId)
+  const token = await nangoClient.getToken(providerConfigKey, credentialRow.nangoConnectionId)
+
+  if (typeof token === 'string' && token) {
+    return token
+  }
+
+  if (token && typeof token === 'object') {
+    // OAuth2 client credentials or similar
+    if ('access_token' in token) {
+      const t = (token as { access_token?: string }).access_token
+      if (t) return t
+    }
+    // API key credentials (e.g. PostHog) — Nango returns { type: 'API_KEY', apiKey: '...' }
+    if ('apiKey' in token) {
+      const t = (token as { apiKey?: string }).apiKey
+      if (t) return t
+    }
+  }
+
+  throw new Error(`Nango did not return a usable token (type=${typeof token}, keys=${token && typeof token === 'object' ? Object.keys(token).join(',') : 'N/A'})`)
 }
 
 /**

@@ -104,6 +104,6 @@ export function createAnonymousSession(): AnonymousSession {
   }
 }
 
-export function createAnonymousGetSessionResponse(): { data: AnonymousSession } {
-  return { data: createAnonymousSession() }
+export function createAnonymousGetSessionResponse(): AnonymousSession {
+  return createAnonymousSession()
 }

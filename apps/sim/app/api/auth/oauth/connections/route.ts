@@ -1,6 +1,6 @@
-import { account, db, user } from '@sim/db'
+import { account, credential, db, user } from '@sim/db'
 import { createLogger } from '@sim/logger'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { jwtDecode } from 'jwt-decode'
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
@@ -126,6 +126,44 @@ export async function GET(request: NextRequest) {
             accounts: [accountSummary],
           })
         }
+      }
+    }
+
+    // Include Nango-managed credentials as connections
+    const nangoCredentials = await db
+      .select({
+        id: credential.id,
+        providerId: credential.providerId,
+        displayName: credential.displayName,
+        updatedAt: credential.updatedAt,
+      })
+      .from(credential)
+      .where(and(eq(credential.type, 'nango'), eq(credential.createdBy, session.user.id)))
+
+    for (const cred of nangoCredentials) {
+      if (!cred.providerId) continue
+      const { baseProvider, featureType } = parseProvider(cred.providerId as OAuthProvider)
+
+      const existing = connections.find((c) => c.provider === cred.providerId)
+      const accountSummary = { id: cred.id, name: cred.displayName }
+
+      if (existing) {
+        existing.accounts = existing.accounts || []
+        existing.accounts.push(accountSummary)
+        const existingTs = existing.lastConnected ? new Date(existing.lastConnected).getTime() : 0
+        if (cred.updatedAt.getTime() > existingTs) {
+          existing.lastConnected = cred.updatedAt.toISOString()
+        }
+      } else {
+        connections.push({
+          provider: cred.providerId,
+          baseProvider,
+          featureType,
+          isConnected: true,
+          scopes: [],
+          lastConnected: cred.updatedAt.toISOString(),
+          accounts: [accountSummary],
+        })
       }
     }
 

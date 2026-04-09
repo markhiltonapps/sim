@@ -1230,7 +1230,9 @@ export const Sidebar = memo(function Sidebar() {
                         unoptimized
                       />
                     ) : (
-                      <Wordmark className='h-[16px] w-auto text-[var(--text-body)]' />
+                      <span className='font-semibold text-[var(--text-body)] text-sm leading-none'>
+                        {brand.name}
+                      </span>
                     )}
                   </Link>
                   <SidebarTooltip label='Expand sidebar' enabled={showCollapsedTooltips}>

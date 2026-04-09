@@ -364,6 +364,8 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
           'Mail.ReadBasic',
           'Mail.Read',
           'Mail.Send',
+          'Calendars.Read',
+          'Calendars.ReadWrite',
           'offline_access',
         ],
       },

@@ -136,6 +136,7 @@ import { OneDriveBlock } from '@/blocks/blocks/onedrive'
 import { OnePasswordBlock } from '@/blocks/blocks/onepassword'
 import { OpenAIBlock } from '@/blocks/blocks/openai'
 import { OutlookBlock } from '@/blocks/blocks/outlook'
+import { OutlookCalendarBlock } from '@/blocks/blocks/outlook_calendar'
 import { PagerDutyBlock } from '@/blocks/blocks/pagerduty'
 import { ParallelBlock } from '@/blocks/blocks/parallel'
 import { PerplexityBlock } from '@/blocks/blocks/perplexity'
@@ -373,6 +374,7 @@ export const registry: Record<string, BlockConfig> = {
   onedrive: OneDriveBlock,
   openai: OpenAIBlock,
   outlook: OutlookBlock,
+  outlook_calendar: OutlookCalendarBlock,
   pagerduty: PagerDutyBlock,
   parallel_ai: ParallelBlock,
   perplexity: PerplexityBlock,

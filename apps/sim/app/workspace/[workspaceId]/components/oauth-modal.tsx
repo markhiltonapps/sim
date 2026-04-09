@@ -17,6 +17,7 @@ import {
 import { client, useSession } from '@/lib/auth/auth-client'
 import type { OAuthReturnContext } from '@/lib/credentials/client-state'
 import { ADD_CONNECTOR_SEARCH_PARAM, writeOAuthReturnContext } from '@/lib/credentials/client-state'
+import { getEnv, isTruthy } from '@/lib/core/config/env'
 import {
   getCanonicalScopesForProvider,
   getProviderIdFromServiceId,
@@ -25,7 +26,10 @@ import {
   parseProvider,
 } from '@/lib/oauth'
 import { getScopeDescription } from '@/lib/oauth/utils'
+import { API_KEY_PROVIDERS } from '@/lib/nango/providers'
 import { useCreateCredentialDraft } from '@/hooks/queries/credentials'
+
+const NANGO_ENABLED = isTruthy(getEnv('NEXT_PUBLIC_NANGO_ENABLED'))
 
 const logger = createLogger('OAuthModal')
 const EMPTY_SCOPES: string[] = []
@@ -110,6 +114,10 @@ export function OAuthModal(props: OAuthModalProps) {
 
   const providerId = getProviderIdFromServiceId(serviceId)
 
+  const isApiKeyProvider = NANGO_ENABLED && API_KEY_PROVIDERS.has(providerId)
+  const [apiKey, setApiKey] = useState('')
+  const [projectId, setProjectId] = useState('')
+
   const [displayName, setDisplayName] = useState(() =>
     isConnect ? getDefaultCredentialName(session?.user?.name, providerName, credentialCount) : ''
   )
@@ -151,6 +159,91 @@ export function OAuthModal(props: OAuthModalProps) {
     setError(null)
 
     try {
+      if (!isConnect && onConnectOverride) {
+        await onConnectOverride()
+        onClose()
+        return
+      }
+
+      // Use Nango when configured
+      if (NANGO_ENABLED) {
+        if (isConnect) {
+          const trimmedName = displayName.trim()
+          if (!trimmedName) {
+            setError('Display name is required.')
+            return
+          }
+
+          const userId = session?.user?.id
+          if (!userId) {
+            setError('User session not found. Please refresh and try again.')
+            return
+          }
+
+          // Get a short-lived session token from our backend
+          const sessionRes = await fetch('/api/auth/nango/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ providerId }),
+          })
+          if (!sessionRes.ok) {
+            const json = (await sessionRes.json().catch(() => ({}))) as { error?: string }
+            setError(json.error || 'Failed to start OAuth session.')
+            return
+          }
+          const { sessionToken } = (await sessionRes.json()) as { sessionToken: string }
+
+          if (isApiKeyProvider && !apiKey.trim()) {
+            setError('API key is required.')
+            return
+          }
+
+          const { default: Nango } = await import('@nangohq/frontend')
+          const nango = new Nango({ connectSessionToken: sessionToken })
+
+          const authResult = isApiKeyProvider
+            ? await nango.auth(providerId, { credentials: { apiKey: apiKey.trim() } })
+            : await nango.auth(providerId)
+          const nangoConnectionId = authResult.connectionId
+
+          const res = await fetch('/api/auth/nango/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              providerId,
+              displayName: trimmedName,
+              workspaceId,
+              nangoConnectionId,
+              ...(isApiKeyProvider && projectId.trim() ? { extraConfig: { projectId: projectId.trim() } } : {}),
+            }),
+          })
+
+          if (!res.ok) {
+            const json = (await res.json().catch(() => ({}))) as { error?: string }
+            setError(json.error || 'Failed to save connection.')
+            return
+          }
+
+          // Signal credential refresh so the selector re-fetches
+          const baseCtx = {
+            displayName: trimmedName,
+            providerId,
+            preCount: credentialCount,
+            workspaceId,
+            requestedAt: Date.now(),
+          }
+          writeOAuthReturnContext(
+            knowledgeBaseId
+              ? { ...baseCtx, origin: 'kb-connectors' as const, knowledgeBaseId, connectorType }
+              : { ...baseCtx, origin: 'workflow' as const, workflowId: workflowId! }
+          )
+        }
+
+        handleClose()
+        return
+      }
+
+      // Fallback: native Better Auth OAuth flow
       if (isConnect) {
         const trimmedName = displayName.trim()
         if (!trimmedName) {
@@ -177,12 +270,6 @@ export function OAuthModal(props: OAuthModalProps) {
           : { ...baseContext, origin: 'workflow' as const, workflowId: workflowId! }
 
         writeOAuthReturnContext(returnContext)
-      }
-
-      if (!isConnect && onConnectOverride) {
-        await onConnectOverride()
-        onClose()
-        return
       }
 
       if (!isConnect) {
@@ -214,12 +301,21 @@ export function OAuthModal(props: OAuthModalProps) {
       handleClose()
     } catch (err) {
       logger.error('Failed to initiate OAuth connection', { error: err })
-      setError('Failed to connect. Please try again.')
+      const nangoErr = err as { message?: string; type?: string; error?: string }
+      const message =
+        nangoErr?.message ||
+        nangoErr?.error ||
+        (err instanceof Error ? err.message : String(err))
+      setError(message || 'Failed to connect. Please try again.')
     }
   }
 
   const isPending = isConnect && createDraft.isPending
-  const isConnectDisabled = isConnect ? !displayName.trim() || Boolean(isPending) : false
+  const isConnectDisabled = isConnect
+    ? !displayName.trim() ||
+      Boolean(isPending) ||
+      (isApiKeyProvider && (!apiKey.trim() || !projectId.trim()))
+    : false
 
   const subtitle = isConnect
     ? `Grant access to use ${providerName} in your ${knowledgeBaseId ? 'knowledge base' : 'workflow'}`
@@ -289,6 +385,56 @@ export function OAuthModal(props: OAuthModalProps) {
                   data-lpignore='true'
                   className='mt-1.5'
                 />
+              </div>
+            )}
+
+            {isConnect && isApiKeyProvider && (
+              <div className='flex flex-col gap-3'>
+                <div>
+                  <Label>
+                    Personal API Key <span className='text-[var(--text-muted)]'>*</span>
+                  </Label>
+                  <Input
+                    type='password'
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value)
+                      setError(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isPending) void handleConnect()
+                    }}
+                    placeholder='phx_...'
+                    autoComplete='off'
+                    data-lpignore='true'
+                    className='mt-1.5'
+                  />
+                  <p className='mt-1 text-[11px] text-[var(--text-tertiary)]'>
+                    Found in {providerName} → Settings → Personal API Keys
+                  </p>
+                </div>
+                <div>
+                  <Label>
+                    Project ID <span className='text-[var(--text-muted)]'>*</span>
+                  </Label>
+                  <Input
+                    value={projectId}
+                    onChange={(e) => {
+                      setProjectId(e.target.value)
+                      setError(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isPending) void handleConnect()
+                    }}
+                    placeholder='12345'
+                    autoComplete='off'
+                    data-lpignore='true'
+                    className='mt-1.5'
+                  />
+                  <p className='mt-1 text-[11px] text-[var(--text-tertiary)]'>
+                    Found in your {providerName} URL: posthog.com/project/<strong>12345</strong>/...
+                  </p>
+                </div>
               </div>
             )}
 

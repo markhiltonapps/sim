@@ -2315,6 +2315,7 @@ export const credentialTypeEnum = pgEnum('credential_type', [
   'env_workspace',
   'env_personal',
   'service_account',
+  'nango',
 ])
 
 export const credential = pgTable(
@@ -2331,6 +2332,7 @@ export const credential = pgTable(
     accountId: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
     envKey: text('env_key'),
     envOwnerUserId: text('env_owner_user_id').references(() => user.id, { onDelete: 'cascade' }),
+    nangoConnectionId: text('nango_connection_id'),
     encryptedServiceAccountKey: text('encrypted_service_account_key'),
     createdBy: text('created_by')
       .notNull()
@@ -2353,9 +2355,17 @@ export const credential = pgTable(
     workspacePersonalEnvUnique: uniqueIndex('credential_workspace_personal_env_unique')
       .on(table.workspaceId, table.type, table.envKey, table.envOwnerUserId)
       .where(sql`type = 'env_personal'`),
+    nangoConnectionIdIdx: index('credential_nango_connection_id_idx').on(table.nangoConnectionId),
+    workspaceNangoUnique: uniqueIndex('credential_workspace_nango_unique')
+      .on(table.workspaceId, table.providerId, table.nangoConnectionId)
+      .where(sql`nango_connection_id IS NOT NULL`),
     oauthSourceConstraint: check(
       'credential_oauth_source_check',
       sql`(type <> 'oauth') OR (account_id IS NOT NULL AND provider_id IS NOT NULL)`
+    ),
+    nangoSourceConstraint: check(
+      'credential_nango_source_check',
+      sql`(type <> 'nango') OR (nango_connection_id IS NOT NULL AND provider_id IS NOT NULL)`
     ),
     workspaceEnvSourceConstraint: check(
       'credential_workspace_env_source_check',

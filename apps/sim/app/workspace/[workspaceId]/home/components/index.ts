@@ -1,4 +1,6 @@
+export { AgentChat } from './agent-chat'
 export { ChatMessageAttachments } from './chat-message-attachments'
+export { ConnectAppsModal } from './connect-apps-modal'
 export {
   assistantMessageHasRenderableContent,
   MessageContent,

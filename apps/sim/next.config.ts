@@ -94,6 +94,7 @@ const nextConfig: NextConfig = {
     '/*': ['./node_modules/sharp/**/*', './node_modules/@img/**/*', './dist/pptx-worker.cjs'],
   },
   experimental: {
+    proxyClientMaxBodySize: '50mb',
     optimizeCss: true,
     turbopackSourceMaps: false,
     turbopackFileSystemCacheForDev: true,

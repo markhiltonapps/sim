@@ -99,7 +99,7 @@ export function InboxSettingsTab() {
       <div className='flex flex-col gap-6'>
         {config?.address && (
           <div className='flex flex-col gap-1.5'>
-            <div className='font-medium text-[var(--text-secondary)] text-sm'>Sim&apos;s email</div>
+            <div className='font-medium text-[var(--text-secondary)] text-sm'>Neato_SIM&apos;s email</div>
             <div className='flex items-center justify-between'>
               <p className='text-[var(--text-muted)] text-small'>
                 Send emails here to create tasks.

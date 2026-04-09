@@ -463,7 +463,7 @@ export function General() {
       </div>
 
       <p className='-mt-2 text-[var(--text-muted)] text-small'>
-        We use OpenTelemetry to collect anonymous usage data to improve Sim. You can opt-out at any
+        We use OpenTelemetry to collect anonymous usage data to improve Neato_SIM. You can opt-out at any
         time.
       </p>
 

@@ -319,6 +319,10 @@ export const env = createEnv({
     ATTIO_CLIENT_ID:                       z.string().optional(),                  // Attio OAuth client ID
     ATTIO_CLIENT_SECRET:                   z.string().optional(),                  // Attio OAuth client secret
 
+    // Nango OAuth Integration Platform
+    NANGO_SECRET_KEY:                      z.string().min(1).optional(),           // Nango secret key for server-side token management
+    NANGO_BASE_URL:                        z.string().url().optional(),            // Nango server URL (default: https://api.nango.dev for cloud)
+
     // AgentMail - Mothership Email Inbox
     AGENTMAIL_API_KEY:                     z.string().min(1).optional(),           // AgentMail API key for mothership email inbox
     AGENTMAIL_DOMAIN:                      z.string().optional(),                  // Custom domain for AgentMail inboxes (default: agentmail.to)
@@ -405,6 +409,7 @@ export const env = createEnv({
     NEXT_PUBLIC_CUSTOM_CSS_URL:            z.string().url().optional(),            // Custom CSS stylesheet URL
     NEXT_PUBLIC_SUPPORT_EMAIL:             z.string().email().optional(),          // Custom support email
 
+    NEXT_PUBLIC_NANGO_ENABLED:             z.boolean().optional(),                 // Set to true to enable Nango OAuth instead of native OAuth
     NEXT_PUBLIC_E2B_ENABLED:               z.string().optional(),
     NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS: z.string().optional(),              // Hide Bedrock credential fields when deployment uses AWS default credential chain (IAM roles, instance profiles, ECS task roles, IRSA)
     NEXT_PUBLIC_AZURE_CONFIGURED:          z.string().optional(),              // Hide Azure credential fields when endpoint/key/version are pre-configured server-side
@@ -465,6 +470,7 @@ export const env = createEnv({
     NEXT_PUBLIC_INBOX_ENABLED: process.env.NEXT_PUBLIC_INBOX_ENABLED,
     NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED: process.env.NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_NANGO_ENABLED: process.env.NEXT_PUBLIC_NANGO_ENABLED,
     NEXT_PUBLIC_E2B_ENABLED: process.env.NEXT_PUBLIC_E2B_ENABLED,
     NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS: process.env.NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS,
     NEXT_PUBLIC_AZURE_CONFIGURED: process.env.NEXT_PUBLIC_AZURE_CONFIGURED,

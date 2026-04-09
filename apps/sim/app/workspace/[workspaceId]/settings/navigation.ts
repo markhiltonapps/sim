@@ -116,7 +116,7 @@ export const allNavigationItems: NavigationItem[] = [
   { id: 'custom-tools', label: 'Custom Tools', icon: Wrench, section: 'tools' },
   { id: 'skills', label: 'Skills', icon: AgentSkillsIcon, section: 'tools' },
   { id: 'mcp', label: 'MCP Tools', icon: McpIcon, section: 'tools' },
-  { id: 'apikeys', label: 'Sim Keys', icon: TerminalWindow, section: 'system' },
+  { id: 'apikeys', label: 'Neato_SIM Keys', icon: TerminalWindow, section: 'system' },
   { id: 'workflow-mcp-servers', label: 'MCP Servers', icon: Server, section: 'system' },
   {
     id: 'byok',

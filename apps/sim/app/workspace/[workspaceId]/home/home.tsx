@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createLogger } from '@sim/logger'
+import { useQueryClient } from '@tanstack/react-query'
+import { Plug } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { PanelLeft } from '@/components/emcn/icons'
+import { Button } from '@/components/emcn'
 import { useSession } from '@/lib/auth/auth-client'
+import { isTruthy, getEnv } from '@/lib/core/config/env'
+import type { OAuthProvider } from '@/lib/oauth'
+import { getProviderIdFromServiceId } from '@/lib/oauth/utils'
 import {
   LandingPromptStorage,
   type LandingWorkflowSeed,
@@ -14,10 +20,23 @@ import {
 import { captureEvent } from '@/lib/posthog/client'
 import { persistImportedWorkflow } from '@/lib/workflows/operations/import-export'
 import { useChatHistory, useMarkTaskRead } from '@/hooks/queries/tasks'
+import { connectedServicesKeys, useConnectedServices } from '@/hooks/queries/home-agent'
+import { scheduleKeys } from '@/hooks/queries/schedules'
+import { tableKeys } from '@/hooks/queries/tables'
 import type { ChatContext } from '@/stores/panel'
-import { MothershipChat, MothershipView, TemplatePrompts, UserInput } from './components'
-import { getMothershipUseChatOptions, useChat, useMothershipResize } from './hooks'
+import {
+  AgentChat,
+  ConnectAppsModal,
+  MothershipChat,
+  MothershipView,
+  TemplatePrompts,
+  UserInput,
+} from './components'
+import { OAuthModal } from '@/app/workspace/[workspaceId]/components/oauth-modal'
+import { getMothershipUseChatOptions, useAgentChat, useChat, useMothershipResize } from './hooks'
 import type { FileAttachmentForApi, MothershipResource, MothershipResourceType } from './types'
+
+const NANGO_ENABLED = isTruthy(getEnv('NEXT_PUBLIC_NANGO_ENABLED'))
 
 const logger = createLogger('Home')
 
@@ -39,7 +58,55 @@ export function Home({ chatId }: HomeProps = {}) {
   const templateRef = useRef<HTMLDivElement>(null)
   const baseInputHeightRef = useRef<number | null>(null)
 
+  const queryClient = useQueryClient()
   const [isInputEntering, setIsInputEntering] = useState(false)
+  const [isAgentMode, setIsAgentMode] = useState(() => {
+    if (!NANGO_ENABLED) return false
+    try {
+      return localStorage.getItem('sim:agentMode') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [isConnectAppsOpen, setIsConnectAppsOpen] = useState(false)
+  const [inlineConnectServiceId, setInlineConnectServiceId] = useState<string | null>(null)
+
+  const setAgentMode = useCallback((value: boolean) => {
+    setIsAgentMode(value)
+    try { localStorage.setItem('sim:agentMode', String(value)) } catch {}
+  }, [])
+
+  const handleConnectFromChat = useCallback((serviceId: string) => {
+    setInlineConnectServiceId(serviceId)
+  }, [])
+
+  const handleInlineConnectClose = useCallback(() => {
+    setInlineConnectServiceId(null)
+    queryClient.invalidateQueries({ queryKey: connectedServicesKeys.list(workspaceId) })
+  }, [queryClient, workspaceId])
+
+  const { data: connectedServices = [] } = useConnectedServices(
+    NANGO_ENABLED ? workspaceId : undefined
+  )
+  const connectedProviderIds = new Set(connectedServices.map((s) => s.providerId))
+  const hasConnectedServices = connectedServices.length > 0
+
+  // Auto-enable agent mode once the user has connected at least one service
+  useEffect(() => {
+    if (NANGO_ENABLED && hasConnectedServices && !isAgentMode) {
+      setAgentMode(true)
+    }
+  }, [hasConnectedServices]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScheduleCreated = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() })
+  }, [queryClient])
+
+  const handleTableCreated = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: tableKeys.lists() })
+  }, [queryClient])
+
+  const agentChat = useAgentChat({ workspaceId, onScheduleCreated: handleScheduleCreated, onTableCreated: handleTableCreated })
 
   const createWorkflowFromLandingSeed = useCallback(
     async (seed: LandingWorkflowSeed) => {
@@ -326,105 +393,248 @@ export function Home({ chatId }: HomeProps = {}) {
     return () => ro.disconnect()
   }, [hasMessages])
 
-  if (!hasMessages && !chatId) {
+  if (!hasMessages && !chatId && (!isAgentMode || agentChat.messages.length === 0)) {
     return (
-      <div className='h-full overflow-y-auto bg-[var(--bg)] [scrollbar-gutter:stable_both-edges]'>
-        <div className='flex min-h-full flex-col items-center justify-center px-6 pb-[2vh]'>
-          <h1
-            data-tour='home-greeting'
-            className='mb-6 max-w-[42rem] text-balance font-[430] font-season text-[32px] text-[var(--text-primary)] tracking-[-0.02em]'
+      <>
+        <div className='h-full overflow-y-auto bg-[var(--bg)] [scrollbar-gutter:stable_both-edges]'>
+          <div className='flex min-h-full flex-col items-center justify-center px-6 pb-[2vh]'>
+            <h1
+              data-tour='home-greeting'
+              className='mb-6 max-w-[42rem] text-balance font-[430] font-season text-[32px] text-[var(--text-primary)] tracking-[-0.02em]'
+            >
+              What should we get done
+              {session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}?
+            </h1>
+            <div ref={initialViewInputRef} className='w-full' data-tour='home-chat-input'>
+              {isAgentMode ? (
+                <UserInput
+                  defaultValue={initialPrompt}
+                  onSubmit={(text) => agentChat.sendMessage(text)}
+                  isSending={agentChat.isSending}
+                  onStopGeneration={agentChat.stopGeneration}
+                  userId={session?.user?.id}
+                  isInitialView
+                />
+              ) : (
+                <UserInput
+                  defaultValue={initialPrompt}
+                  onSubmit={handleSubmit}
+                  isSending={isSending}
+                  onStopGeneration={handleStopGeneration}
+                  userId={session?.user?.id}
+                  onContextAdd={handleContextAdd}
+                />
+              )}
+            </div>
+
+            {/* Agent mode toggle + Connect Apps */}
+            {NANGO_ENABLED && (
+              <div className='mt-3 flex items-center gap-2'>
+                <button
+                  type='button'
+                  onClick={() => setAgentMode(!isAgentMode)}
+                  className={`flex h-[28px] items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors ${
+                    isAgentMode
+                      ? 'bg-[var(--text-primary)] text-[var(--surface-1)]'
+                      : 'bg-[var(--surface-3)] text-[var(--text-secondary)] hover:bg-[var(--surface-4)]'
+                  }`}
+                >
+                  <Plug className='h-[10px] w-[10px]' />
+                  {isAgentMode ? 'Agent mode' : 'Use agent'}
+                </button>
+                {hasConnectedServices && (
+                  <span className='text-[11px] text-[var(--text-secondary)]'>
+                    {connectedServices.length} app{connectedServices.length !== 1 ? 's' : ''} connected
+                  </span>
+                )}
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={() => setIsConnectAppsOpen(true)}
+                  className='h-[28px] px-2 text-[11px] text-[var(--text-secondary)]'
+                >
+                  Connect apps
+                </Button>
+              </div>
+            )}
+          </div>
+          <div
+            ref={templateRef}
+            data-tour='home-templates'
+            className='-mt-[30vh] mx-auto w-full max-w-[68rem] px-4 pb-8 sm:px-6 lg:px-10'
           >
-            What should we get done
-            {session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}?
-          </h1>
-          <div ref={initialViewInputRef} className='w-full' data-tour='home-chat-input'>
-            <UserInput
-              defaultValue={initialPrompt}
-              onSubmit={handleSubmit}
-              isSending={isSending}
-              onStopGeneration={handleStopGeneration}
+            {!isAgentMode && <TemplatePrompts onSelect={handleSubmit} />}
+          </div>
+        </div>
+
+        {NANGO_ENABLED && (
+          <ConnectAppsModal
+            isOpen={isConnectAppsOpen}
+            onClose={() => setIsConnectAppsOpen(false)}
+            workspaceId={workspaceId}
+            connectedProviderIds={connectedProviderIds}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Agent mode chat view
+  if (isAgentMode) {
+    return (
+      <>
+        <div className='relative flex h-full flex-col bg-[var(--bg)]'>
+          {/* Agent mode header */}
+          <div className='flex items-center justify-between border-b border-[var(--border)] px-4 py-2'>
+            <div className='flex items-center gap-2'>
+              <Plug className='h-[14px] w-[14px] text-[var(--text-secondary)]' />
+              <span className='text-[13px] font-medium text-[var(--text-primary)]'>Agent Mode</span>
+              {connectedServices.length > 0 && (
+                <span className='text-[11px] text-[var(--text-secondary)]'>
+                  · {connectedServices.map((s) => s.displayName || s.providerId).join(', ')}
+                </span>
+              )}
+            </div>
+            <div className='flex items-center gap-2'>
+              {NANGO_ENABLED && (
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={() => setIsConnectAppsOpen(true)}
+                  className='h-[26px] px-2 text-[11px]'
+                >
+                  <Plug className='h-[10px] w-[10px]' />
+                  Connect apps
+                </Button>
+              )}
+              <button
+                type='button'
+                onClick={() => {
+                  setAgentMode(false)
+                  agentChat.clearMessages()
+                }}
+                className='text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              >
+                Exit agent
+              </button>
+            </div>
+          </div>
+
+          <div className='flex-1 overflow-hidden'>
+            <AgentChat
+              messages={agentChat.messages}
+              isSending={agentChat.isSending}
+              onSubmit={(text) => agentChat.sendMessage(text)}
+              onStopGeneration={agentChat.stopGeneration}
+              onConnectService={NANGO_ENABLED ? handleConnectFromChat : undefined}
+              connectedServices={connectedServices}
               userId={session?.user?.id}
-              onContextAdd={handleContextAdd}
             />
           </div>
         </div>
-        <div
-          ref={templateRef}
-          data-tour='home-templates'
-          className='-mt-[30vh] mx-auto w-full max-w-[68rem] px-4 pb-8 sm:px-6 lg:px-10'
-        >
-          <TemplatePrompts onSelect={handleSubmit} />
-        </div>
-      </div>
+
+        {NANGO_ENABLED && (
+          <ConnectAppsModal
+            isOpen={isConnectAppsOpen}
+            onClose={() => setIsConnectAppsOpen(false)}
+            workspaceId={workspaceId}
+            connectedProviderIds={connectedProviderIds}
+          />
+        )}
+
+        {NANGO_ENABLED && inlineConnectServiceId && (
+          <OAuthModal
+            isOpen
+            onClose={handleInlineConnectClose}
+            provider={getProviderIdFromServiceId(inlineConnectServiceId) as OAuthProvider}
+            serviceId={inlineConnectServiceId}
+            mode='connect'
+            workspaceId={workspaceId}
+            credentialCount={connectedProviderIds.size}
+            knowledgeBaseId='home-agent'
+          />
+        )}
+      </>
     )
   }
 
   return (
-    <div className='relative flex h-full bg-[var(--bg)]'>
-      <div className='flex h-full min-w-[320px] flex-1 flex-col'>
-        <MothershipChat
-          messages={messages}
-          isSending={isSending}
-          isReconnecting={isReconnecting}
-          onSubmit={handleSubmit}
-          onStopGeneration={handleStopGeneration}
-          messageQueue={messageQueue}
-          onRemoveQueuedMessage={removeFromQueue}
-          onSendQueuedMessage={sendNow}
-          onEditQueuedMessage={handleEditQueuedMessage}
-          userId={session?.user?.id}
-          chatId={resolvedChatId}
-          onContextAdd={handleContextAdd}
-          editValue={editingInputValue}
-          onEditValueConsumed={clearEditingValue}
-          animateInput={isInputEntering}
-          onInputAnimationEnd={isInputEntering ? () => setIsInputEntering(false) : undefined}
-          initialScrollBlocked={resources.length > 0 && isResourceCollapsed}
-        />
-      </div>
-
-      {/* Resize handle — zero-width flex child whose absolute child straddles the border */}
-      {!isResourceCollapsed && (
-        <div className='relative z-20 w-0 flex-none'>
-          <div
-            className='absolute inset-y-0 left-[-4px] w-[8px] cursor-ew-resize'
-            role='separator'
-            aria-orientation='vertical'
-            aria-label='Resize resource panel'
-            onPointerDown={handleResizePointerDown}
+    <>
+      <div className='relative flex h-full bg-[var(--bg)]'>
+        <div className='flex h-full min-w-[320px] flex-1 flex-col'>
+          <MothershipChat
+            messages={messages}
+            isSending={isSending}
+            isReconnecting={isReconnecting}
+            onSubmit={handleSubmit}
+            onStopGeneration={handleStopGeneration}
+            messageQueue={messageQueue}
+            onRemoveQueuedMessage={removeFromQueue}
+            onSendQueuedMessage={sendNow}
+            onEditQueuedMessage={handleEditQueuedMessage}
+            userId={session?.user?.id}
+            chatId={resolvedChatId}
+            onContextAdd={handleContextAdd}
+            editValue={editingInputValue}
+            onEditValueConsumed={clearEditingValue}
+            animateInput={isInputEntering}
+            onInputAnimationEnd={isInputEntering ? () => setIsInputEntering(false) : undefined}
+            initialScrollBlocked={resources.length > 0 && isResourceCollapsed}
           />
         </div>
-      )}
 
-      <MothershipView
-        ref={mothershipRef}
-        workspaceId={workspaceId}
-        chatId={resolvedChatId}
-        resources={resources}
-        activeResourceId={activeResourceId}
-        onSelectResource={setActiveResourceId}
-        onAddResource={addResource}
-        onRemoveResource={removeResource}
-        onReorderResources={reorderResources}
-        onCollapse={collapseResource}
-        isCollapsed={isResourceCollapsed}
-        streamingFile={streamingFile}
-        genericResourceData={genericResourceData}
-        className={skipResourceTransition ? '!transition-none' : undefined}
-      />
+        {/* Resize handle — zero-width flex child whose absolute child straddles the border */}
+        {!isResourceCollapsed && (
+          <div className='relative z-20 w-0 flex-none'>
+            <div
+              className='absolute inset-y-0 left-[-4px] w-[8px] cursor-ew-resize'
+              role='separator'
+              aria-orientation='vertical'
+              aria-label='Resize resource panel'
+              onPointerDown={handleResizePointerDown}
+            />
+          </div>
+        )}
 
-      {isResourceCollapsed && (
-        <div className='absolute top-[8.5px] right-[16px]'>
-          <button
-            type='button'
-            onClick={expandResource}
-            className='flex h-[30px] w-[30px] items-center justify-center rounded-[8px] hover-hover:bg-[var(--surface-active)]'
-            aria-label='Expand resource view'
-          >
-            <PanelLeft className='h-[16px] w-[16px] text-[var(--text-icon)]' />
-          </button>
-        </div>
+        <MothershipView
+          ref={mothershipRef}
+          workspaceId={workspaceId}
+          chatId={resolvedChatId}
+          resources={resources}
+          activeResourceId={activeResourceId}
+          onSelectResource={setActiveResourceId}
+          onAddResource={addResource}
+          onRemoveResource={removeResource}
+          onReorderResources={reorderResources}
+          onCollapse={collapseResource}
+          isCollapsed={isResourceCollapsed}
+          streamingFile={streamingFile}
+          genericResourceData={genericResourceData}
+          className={skipResourceTransition ? '!transition-none' : undefined}
+        />
+
+        {isResourceCollapsed && (
+          <div className='absolute top-[8.5px] right-[16px]'>
+            <button
+              type='button'
+              onClick={expandResource}
+              className='flex h-[30px] w-[30px] items-center justify-center rounded-[8px] hover-hover:bg-[var(--surface-active)]'
+              aria-label='Expand resource view'
+            >
+              <PanelLeft className='h-[16px] w-[16px] text-[var(--text-icon)]' />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {NANGO_ENABLED && (
+        <ConnectAppsModal
+          isOpen={isConnectAppsOpen}
+          onClose={() => setIsConnectAppsOpen(false)}
+          workspaceId={workspaceId}
+          connectedProviderIds={connectedProviderIds}
+        />
       )}
-    </div>
+    </>
   )
 }

@@ -13,7 +13,7 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   profile: 'Access your basic profile information',
   email: 'View your email address',
   offline_access: 'Maintain access when you are not actively using the app',
-  'mcp:tools': 'Use Sim workflows and tools on your behalf',
+  'mcp:tools': 'Use Neato_SIM workflows and tools on your behalf',
 } as const
 
 interface ClientInfo {

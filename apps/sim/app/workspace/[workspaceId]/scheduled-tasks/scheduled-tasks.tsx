@@ -103,10 +103,13 @@ export function ScheduledTasks() {
   const filteredItems = useMemo(() => {
     let result = debouncedSearchQuery
       ? visibleItems.filter((item) => {
+          const q = debouncedSearchQuery.toLowerCase()
+          const title = item.jobTitle || ''
           const task = item.prompt || ''
           return (
-            task.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-            getScheduleDescription(item).toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+            title.toLowerCase().includes(q) ||
+            task.toLowerCase().includes(q) ||
+            getScheduleDescription(item).toLowerCase().includes(q)
           )
         })
       : visibleItems
@@ -171,7 +174,7 @@ export function ScheduledTasks() {
         cells: {
           task: {
             icon: <Calendar className='h-[14px] w-[14px]' />,
-            label: item.prompt,
+            label: item.jobTitle || item.prompt,
           },
           schedule: { label: getScheduleDescription(item) },
           nextRun: timeCell(item.nextRunAt),

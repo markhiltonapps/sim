@@ -64,8 +64,8 @@ export function CreateApiKeyModal({
     if (isDuplicate) {
       setCreateError(
         keyType === 'workspace'
-          ? `A workspace Sim key named "${trimmedName}" already exists. Please choose a different name.`
-          : `A personal Sim key named "${trimmedName}" already exists. Please choose a different name.`
+          ? `A workspace Neato_SIM key named "${trimmedName}" already exists. Please choose a different name.`
+          : `A personal Neato_SIM key named "${trimmedName}" already exists. Please choose a different name.`
       )
       return
     }
@@ -89,11 +89,11 @@ export function CreateApiKeyModal({
     } catch (error: unknown) {
       logger.error('API key creation failed:', { error })
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to create Sim key. Please try again.'
+        error instanceof Error ? error.message : 'Failed to create Neato_SIM key. Please try again.'
       if (errorMessage.toLowerCase().includes('already exists')) {
         setCreateError(errorMessage)
       } else {
-        setCreateError('Failed to create Sim key. Please check your connection and try again.')
+        setCreateError('Failed to create Neato_SIM key. Please check your connection and try again.')
       }
     }
   }
@@ -116,7 +116,7 @@ export function CreateApiKeyModal({
       {/* Create API Key Dialog */}
       <Modal open={open} onOpenChange={onOpenChange}>
         <ModalContent size='md'>
-          <ModalHeader>Create new Sim key</ModalHeader>
+          <ModalHeader>Create new Neato_SIM key</ModalHeader>
           <ModalBody>
             <p className='text-[var(--text-secondary)]'>
               {keyType === 'workspace'
@@ -144,7 +144,7 @@ export function CreateApiKeyModal({
               )}
               <div className='flex flex-col gap-2'>
                 <p className='font-medium text-[var(--text-secondary)] text-sm'>
-                  Enter a name for your Sim key to help you identify it later.
+                  Enter a name for your Neato_SIM key to help you identify it later.
                 </p>
                 {/* Hidden decoy fields to prevent browser autofill */}
                 <input
@@ -215,10 +215,10 @@ export function CreateApiKeyModal({
         }}
       >
         <ModalContent size='sm'>
-          <ModalHeader>Your Sim key has been created</ModalHeader>
+          <ModalHeader>Your Neato_SIM key has been created</ModalHeader>
           <ModalBody>
             <p className='text-[var(--text-secondary)]'>
-              This is the only time you will see your Sim key.{' '}
+              This is the only time you will see your Neato_SIM key.{' '}
               <span className='font-semibold text-[var(--text-primary)]'>
                 Copy it now and store it securely.
               </span>

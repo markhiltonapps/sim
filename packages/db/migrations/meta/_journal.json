@@ -1303,6 +1303,13 @@
       "when": 1775525922688,
       "tag": "0186_greedy_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "7",
+      "when": 1775635200000,
+      "tag": "0187_nango_credentials",
+      "breakpoints": true
     }
   ]
 }

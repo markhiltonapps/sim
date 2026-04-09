@@ -5,6 +5,17 @@ import { getRedisClient } from '@/lib/core/config/redis'
 
 const logger = createLogger('CopilotStreamBuffer')
 
+/**
+ * In-memory fallback for stream meta when Redis is unavailable (e.g., local dev).
+ * Stored on `global` so it is shared across all Next.js route bundles in the
+ * same Node.js process (each bundle has its own module scope but shares `global`).
+ */
+const _g = global as typeof globalThis & { _simStreamMeta?: Map<string, unknown> }
+if (!_g._simStreamMeta) {
+  _g._simStreamMeta = new Map()
+}
+const inMemoryStreamMeta = _g._simStreamMeta
+
 const STREAM_DEFAULTS = {
   ttlSeconds: 60 * 60,
   eventLimit: 5000,
@@ -99,6 +110,7 @@ export type StreamEventWriter = {
 }
 
 export async function resetStreamBuffer(streamId: string): Promise<void> {
+  inMemoryStreamMeta.delete(streamId)
   const redis = getRedisClient()
   if (!redis) return
   try {
@@ -113,7 +125,10 @@ export async function resetStreamBuffer(streamId: string): Promise<void> {
 
 export async function setStreamMeta(streamId: string, meta: StreamMeta): Promise<void> {
   const redis = getRedisClient()
-  if (!redis) return
+  if (!redis) {
+    inMemoryStreamMeta.set(streamId, { ...meta, updatedAt: meta.updatedAt || new Date().toISOString() })
+    return
+  }
   try {
     const config = getStreamBufferConfig()
     const payload: Record<string, string> = {
@@ -136,7 +151,7 @@ export async function setStreamMeta(streamId: string, meta: StreamMeta): Promise
 
 export async function getStreamMeta(streamId: string): Promise<StreamMeta | null> {
   const redis = getRedisClient()
-  if (!redis) return null
+  if (!redis) return (inMemoryStreamMeta.get(streamId) as StreamMeta | undefined) ?? null
   try {
     const meta = await redis.hgetall(getMetaKey(streamId))
     if (!meta || Object.keys(meta).length === 0) return null
