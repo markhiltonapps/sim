@@ -28,6 +28,7 @@ import {
   Database,
   File,
   HelpCircle,
+  LogOut,
   PanelLeft,
   Plus,
   Search,
@@ -36,7 +37,8 @@ import {
   Table,
   Wordmark,
 } from '@/components/emcn/icons'
-import { useSession } from '@/lib/auth/auth-client'
+import { signOut, useSession } from '@/lib/auth/auth-client'
+import { ANONYMOUS_USER_ID } from '@/lib/auth/constants'
 import { cn } from '@/lib/core/utils/cn'
 import { isMacPlatform } from '@/lib/core/utils/platform'
 import { buildFolderTree } from '@/lib/folders/tree'
@@ -73,6 +75,7 @@ import {
   useWorkspaceManagement,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/hooks'
 import { groupWorkflowsByFolder } from '@/app/workspace/[workspaceId]/w/components/sidebar/utils'
+import { useIsMobileSidebar } from '@/app/workspace/[workspaceId]/components/mobile-sidebar-context'
 import {
   useDuplicateWorkspace,
   useExportWorkspace,
@@ -106,11 +109,13 @@ const logger = createLogger('Sidebar')
 export function SidebarTooltip({
   children,
   label,
+  description,
   enabled,
   side = 'right',
 }: {
   children: React.ReactElement
   label: string
+  description?: string
   enabled: boolean
   side?: 'right' | 'bottom'
 }) {
@@ -119,7 +124,14 @@ export function SidebarTooltip({
     <Tooltip.Root>
       <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
       <Tooltip.Content side={side}>
-        <p>{label}</p>
+        {description ? (
+          <div className='flex flex-col gap-0.5'>
+            <p className='font-medium'>{label}</p>
+            <p className='opacity-70'>{description}</p>
+          </div>
+        ) : (
+          <p>{label}</p>
+        )}
       </Tooltip.Content>
     </Tooltip.Root>
   )
@@ -222,6 +234,7 @@ const SidebarTaskItem = memo(function SidebarTaskItem({
 interface SidebarNavItemData {
   id: string
   label: string
+  description?: string
   icon: React.ComponentType<{ className?: string }>
   href?: string
   onClick?: () => void
@@ -239,14 +252,14 @@ const SidebarNavItem = memo(function SidebarNavItem({
   onContextMenu?: (e: React.MouseEvent, href: string) => void
 }) {
   const Icon = item.icon
-  const baseClasses = 'group flex h-[30px] items-center gap-2 rounded-lg mx-0.5 px-2 text-sm'
+  const baseClasses = 'group flex h-[32px] items-center gap-2.5 rounded-lg mx-0.5 px-2.5 text-sm transition-colors'
   const hoverClasses = !active ? 'hover-hover:bg-[var(--surface-hover)]' : ''
-  const activeClasses = active ? 'bg-[var(--surface-active)]' : ''
+  const activeClasses = active ? 'bg-[#3F51B5]/8 border-l-[3px] border-l-[#3F51B5] pl-[7px]' : ''
 
   const content = (
     <>
-      <Icon className='h-[16px] w-[16px] flex-shrink-0 text-[var(--text-icon)]' />
-      <span className='truncate font-base text-[var(--text-body)]'>{item.label}</span>
+      <Icon className={cn('h-[16px] w-[16px] flex-shrink-0', active ? 'text-[#3F51B5]' : 'text-[var(--text-icon)]')} />
+      <span className={cn('truncate font-base', active ? 'font-medium text-[#3F51B5]' : 'text-[var(--text-body)]')}>{item.label}</span>
     </>
   )
 
@@ -284,7 +297,11 @@ const SidebarNavItem = memo(function SidebarNavItem({
   if (!element) return null
 
   return (
-    <SidebarTooltip label={item.label} enabled={showCollapsedTooltips}>
+    <SidebarTooltip
+      label={item.label}
+      description={showCollapsedTooltips ? undefined : item.description}
+      enabled={showCollapsedTooltips || !!item.description}
+    >
       {element}
     </SidebarTooltip>
   )
@@ -312,6 +329,7 @@ export const Sidebar = memo(function Sidebar() {
   const workflowId = params.workflowId as string | undefined
   const router = useRouter()
   const pathname = usePathname()
+  const isMobileSidebar = useIsMobileSidebar()
 
   const sidebarRef = useRef<HTMLElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -330,7 +348,8 @@ export const Sidebar = memo(function Sidebar() {
   }, [initializeSearchData, filterBlocks])
 
   const setSidebarWidth = useSidebarStore((state) => state.setSidebarWidth)
-  const isCollapsed = useSidebarStore((state) => state.isCollapsed)
+  const storeIsCollapsed = useSidebarStore((state) => state.isCollapsed)
+  const isCollapsed = isMobileSidebar ? false : storeIsCollapsed
   const toggleCollapsed = useSidebarStore((state) => state.toggleCollapsed)
   const _hasHydrated = useSidebarStore((state) => state._hasHydrated)
   const isOnWorkflowPage = !!workflowId
@@ -608,12 +627,14 @@ export const Sidebar = memo(function Sidebar() {
       {
         id: 'home',
         label: 'Home',
+        description: 'Chat with your AI agent',
         icon: Home,
         href: `/workspace/${workspaceId}/home`,
       },
       {
         id: 'search',
         label: 'Search',
+        description: 'Search across your workspace',
         icon: Search,
         onClick: openSearchModal,
       },
@@ -627,6 +648,7 @@ export const Sidebar = memo(function Sidebar() {
         {
           id: 'tables',
           label: 'Tables',
+          description: 'Store and manage structured data',
           icon: Table,
           href: `/workspace/${workspaceId}/tables`,
           hidden: permissionConfig.hideTablesTab,
@@ -634,6 +656,7 @@ export const Sidebar = memo(function Sidebar() {
         {
           id: 'files',
           label: 'Files',
+          description: 'Upload and manage documents',
           icon: File,
           href: `/workspace/${workspaceId}/files`,
           hidden: permissionConfig.hideFilesTab,
@@ -641,6 +664,7 @@ export const Sidebar = memo(function Sidebar() {
         {
           id: 'knowledge-base',
           label: 'Knowledge Base',
+          description: 'Train your AI with custom knowledge',
           icon: Database,
           href: `/workspace/${workspaceId}/knowledge`,
           hidden: permissionConfig.hideKnowledgeBaseTab,
@@ -648,12 +672,14 @@ export const Sidebar = memo(function Sidebar() {
         {
           id: 'scheduled-tasks',
           label: 'Scheduled Tasks',
+          description: 'Automate recurring tasks on a schedule',
           icon: Calendar,
           href: `/workspace/${workspaceId}/scheduled-tasks`,
         },
         {
           id: 'logs',
           label: 'Logs',
+          description: 'View activity and execution history',
           icon: Library,
           href: `/workspace/${workspaceId}/logs`,
         },
@@ -671,6 +697,7 @@ export const Sidebar = memo(function Sidebar() {
       {
         id: 'settings',
         label: 'Settings',
+        description: 'Manage integrations, API keys, and preferences',
         icon: Settings,
         href: getSettingsHref(),
         onClick: () => {
@@ -689,6 +716,18 @@ export const Sidebar = memo(function Sidebar() {
       new CustomEvent(isOnWorkflowPage ? START_WORKFLOW_TOUR_EVENT : START_NAV_TOUR_EVENT)
     )
   }, [isOnWorkflowPage])
+
+  const isAuthDisabled = sessionData?.user?.id === ANONYMOUS_USER_ID
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      const { clearUserData } = await import('@/stores')
+      await Promise.all([signOut(), clearUserData()])
+      router.push('/login?fromLogout=true')
+    } catch (error) {
+      router.push('/login?fromLogout=true')
+    }
+  }, [router])
 
   const { data: fetchedTasks = [], isLoading: tasksLoading } = useTasks(workspaceId)
 
@@ -1306,7 +1345,10 @@ export const Sidebar = memo(function Sidebar() {
               />
             ) : (
               <>
-                <div className='mt-2.5 flex flex-shrink-0 flex-col gap-0.5 px-2'>
+                <div className='mt-3 flex flex-shrink-0 flex-col gap-0.5 px-2'>
+                  <div className='px-2.5 pb-1.5'>
+                    <div className='text-[10px] font-semibold tracking-[0.08em] text-[#94A3B8]'>MAIN</div>
+                  </div>
                   {topNavItems.map((item) => (
                     <SidebarNavItem
                       key={item.id}
@@ -1318,9 +1360,9 @@ export const Sidebar = memo(function Sidebar() {
                   ))}
                 </div>
 
-                <div className='mt-3.5 flex flex-shrink-0 flex-col pb-2'>
-                  <div className='px-4 pb-1.5'>
-                    <div className='font-base text-[var(--text-icon)] text-small'>Workspace</div>
+                <div className='mt-4 flex flex-shrink-0 flex-col pb-2'>
+                  <div className='px-4 pb-2'>
+                    <div className='text-[10px] font-semibold tracking-[0.08em] text-[#94A3B8]'>WORKSPACE</div>
                   </div>
                   <div className='flex flex-col gap-0.5 px-2'>
                     {workspaceNavItems.map((item) => (
@@ -1348,8 +1390,8 @@ export const Sidebar = memo(function Sidebar() {
                       data-tour='nav-tasks'
                     >
                       <div className='flex h-[18px] flex-shrink-0 items-center justify-between px-4'>
-                        <div className='font-base text-[var(--text-icon)] text-small'>
-                          All tasks
+                        <div className='text-[10px] font-semibold tracking-[0.08em] text-[#94A3B8]'>
+                          ALL TASKS
                         </div>
                         {!isCollapsed && (
                           <div className='flex items-center justify-center gap-2'>
@@ -1474,8 +1516,8 @@ export const Sidebar = memo(function Sidebar() {
                       data-tour='nav-workflows'
                     >
                       <div className='flex h-[18px] flex-shrink-0 items-center justify-between px-4'>
-                        <div className='font-base text-[var(--text-icon)] text-small'>
-                          Workflows
+                        <div className='text-[10px] font-semibold tracking-[0.08em] text-[#94A3B8]'>
+                          WORKFLOWS
                         </div>
                         {!isCollapsed && (
                           <div className='flex items-center justify-center gap-2'>
@@ -1632,7 +1674,7 @@ export const Sidebar = memo(function Sidebar() {
                   )}
                 >
                   <DropdownMenu>
-                    <SidebarTooltip label='Help' enabled={showCollapsedTooltips}>
+                    <SidebarTooltip label='Help' description={showCollapsedTooltips ? undefined : 'Docs, report issues, and product tour'} enabled={true}>
                       <DropdownMenuTrigger asChild>
                         <button
                           type='button'
@@ -1671,6 +1713,23 @@ export const Sidebar = memo(function Sidebar() {
                       onContextMenu={item.href ? handleNavItemContextMenu : undefined}
                     />
                   ))}
+
+                  {!isAuthDisabled && (
+                    <div className='mt-1 border-t border-[var(--border-light)] pt-1'>
+                      <SidebarTooltip label='Sign out' enabled={showCollapsedTooltips}>
+                        <button
+                          type='button'
+                          onClick={handleSignOut}
+                          className='mx-0.5 flex h-[30px] w-full items-center gap-2 rounded-[8px] px-2 text-[14px] hover-hover:bg-[var(--surface-hover)]'
+                        >
+                          <LogOut className='h-[16px] w-[16px] flex-shrink-0 text-[var(--text-icon)]' />
+                          <span className='sidebar-collapse-hide truncate font-base text-[var(--text-body)]'>
+                            Sign out
+                          </span>
+                        </button>
+                      </SidebarTooltip>
+                    </div>
+                  )}
                 </div>
 
                 <NavItemContextMenu
@@ -1719,7 +1778,7 @@ export const Sidebar = memo(function Sidebar() {
           </div>
         </aside>
 
-        {(isCollapsed || isOnWorkflowPage) && (
+        {!isMobileSidebar && (isCollapsed || isOnWorkflowPage) && (
           <div
             className={cn(
               'absolute top-0 right-0 bottom-0 z-20 w-[8px] translate-x-1/2',
