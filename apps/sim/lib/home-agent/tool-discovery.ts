@@ -4,10 +4,38 @@ import { credential, credentialMember } from '@sim/db/schema'
 import { and, desc, eq } from 'drizzle-orm'
 import type { ToolInput } from '@/executor/handlers/agent/types'
 import { getNangoToken } from '@/app/api/auth/oauth/utils'
+import { getComposioClient } from '@/lib/composio/client'
 import { getNangoClient } from '@/lib/nango/client'
 import { getNangoProviderConfigKey } from '@/lib/nango/providers'
 
 const logger = createLogger('ToolDiscovery')
+
+/**
+ * Maps Composio appName (lowercase) to the PROVIDER_TOOLS key used by the agent.
+ */
+const COMPOSIO_APP_TO_PROVIDER: Record<string, string> = {
+  gmail: 'google-email',
+  googlecalendar: 'google-calendar',
+  googledrive: 'google-drive',
+  googlesheets: 'google-sheets',
+  googledocs: 'google-docs',
+  outlook: 'outlook',
+  slack: 'slack',
+  notion: 'notion',
+  github: 'github',
+  jira: 'jira',
+  linear: 'linear',
+  asana: 'asana',
+  hubspot: 'hubspot',
+  posthog: 'posthog',
+  salesforce: 'salesforce',
+  microsoftteams: 'microsoft-teams',
+  onedrive: 'onedrive',
+  dropbox: 'dropbox',
+  trello: 'trello',
+  airtable: 'airtable',
+  zoom: 'zoom',
+}
 
 /**
  * Maps a Nango providerId to the corresponding agent ToolInputs.
@@ -321,4 +349,76 @@ export function credentialsToToolInputs(
   }
 
   return tools
+}
+
+/**
+ * Discovers Composio-connected apps for a user and returns ToolInputs.
+ * Fetches connections from Composio, resolves access tokens from connectionParams,
+ * and maps to the same tool definitions used by Nango credentials.
+ */
+export async function discoverComposioTools(userId: string): Promise<ToolInput[]> {
+  const composio = getComposioClient()
+  if (!composio) return []
+
+  try {
+    const entity = composio.getEntity(userId)
+    const connections = await entity.getConnections()
+    const activeConnections = connections.filter(
+      (c) => c.status === 'ACTIVE' && !c.isDisabled
+    )
+
+    if (activeConnections.length === 0) return []
+
+    const tools: ToolInput[] = []
+    const seenProviders = new Set<string>()
+
+    for (const conn of activeConnections) {
+      const appName = (conn.appName || conn.appUniqueId || '').toLowerCase()
+      const providerId = COMPOSIO_APP_TO_PROVIDER[appName]
+      if (!providerId || seenProviders.has(providerId)) continue
+      seenProviders.add(providerId)
+
+      const providerTools = PROVIDER_TOOLS[providerId]
+      if (!providerTools) continue
+
+      // Extract access token from Composio connectionParams
+      let accessToken: string | undefined
+      try {
+        const detail = await composio.connectedAccounts.get({
+          connectedAccountId: conn.id,
+        })
+        const params = (detail as Record<string, unknown>).connectionParams as
+          | Record<string, unknown>
+          | undefined
+        accessToken =
+          (params?.access_token as string) ||
+          (params?.accessToken as string) ||
+          (params?.token as string) ||
+          undefined
+      } catch (err) {
+        logger.warn(`Failed to get Composio token for ${appName} (${conn.id})`, err)
+      }
+
+      if (!accessToken) {
+        logger.warn(`No access token available for Composio connection ${appName}, skipping`)
+        continue
+      }
+
+      for (const { blockType, operation } of providerTools) {
+        tools.push({
+          type: blockType,
+          operation,
+          params: { accessToken, operation },
+          usageControl: 'auto',
+        })
+      }
+
+      logger.info(`Composio: added ${providerTools.length} tools for ${appName}`)
+    }
+
+    return tools
+  } catch (error) {
+    logger.error('Failed to discover Composio tools', error)
+    return []
+  }
 }

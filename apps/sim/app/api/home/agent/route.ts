@@ -12,6 +12,7 @@ import { getEffectiveDecryptedEnv } from '@/lib/environment/utils'
 import { validateCronExpression } from '@/lib/workflows/schedules/utils'
 import {
   credentialsToToolInputs,
+  discoverComposioTools,
   discoverNangoCredentials,
   resolveCredentialExtras,
   resolveCredentialTokens,
@@ -425,9 +426,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         emitStatus('Loading your connected services...')
 
-        // Discover tools from connected Nango credentials and load env vars in parallel
-        const [credentials, decryptedEnv] = await Promise.all([
+        // Discover tools from connected Nango credentials, Composio, and load env vars in parallel
+        const [credentials, composioTools, decryptedEnv] = await Promise.all([
           discoverNangoCredentials(workspaceId, userId),
+          discoverComposioTools(userId),
           getEffectiveDecryptedEnv(userId, workspaceId),
         ])
         // Pre-fetch Nango tokens to inject as accessToken directly, bypassing
@@ -435,7 +437,14 @@ export async function POST(request: NextRequest): Promise<Response> {
         const tokens = await resolveCredentialTokens(credentials)
         // Resolve provider-specific extras (e.g., PostHog project ID auto-discovery)
         const extras = await resolveCredentialExtras(credentials, tokens)
-        const tools = credentialsToToolInputs(credentials, tokens, extras)
+        const nangoTools = credentialsToToolInputs(credentials, tokens, extras)
+
+        // Merge: Nango tools first, then Composio tools for providers not already covered
+        const coveredProviders = new Set(nangoTools.map((t) => t.type))
+        const tools = [
+          ...nangoTools,
+          ...composioTools.filter((t) => !coveredProviders.has(t.type)),
+        ]
 
         // Inject env-var-powered tools (web search, etc.)
         const tavilyKey = decryptedEnv.TAVILY_API_KEY
