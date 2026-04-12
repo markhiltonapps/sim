@@ -439,12 +439,16 @@ export async function POST(request: NextRequest): Promise<Response> {
         const extras = await resolveCredentialExtras(credentials, tokens)
         const nangoTools = credentialsToToolInputs(credentials, tokens, extras)
 
-        // Merge: Nango tools first, then Composio tools for providers not already covered
-        const coveredProviders = new Set(nangoTools.map((t) => t.type))
-        const tools = [
-          ...nangoTools,
-          ...composioTools.filter((t) => !coveredProviders.has(t.type)),
-        ]
+        // Merge: Nango tools first, then Composio tools for providers not already covered.
+        // Deduplicate by type+operation to avoid "Tool names must be unique" API errors.
+        const seenToolKeys = new Set<string>()
+        const tools: typeof nangoTools = []
+        for (const tool of [...nangoTools, ...composioTools]) {
+          const key = `${tool.type}:${tool.operation}`
+          if (seenToolKeys.has(key)) continue
+          seenToolKeys.add(key)
+          tools.push(tool)
+        }
 
         // Inject env-var-powered tools (web search, etc.)
         const tavilyKey = decryptedEnv.TAVILY_API_KEY
