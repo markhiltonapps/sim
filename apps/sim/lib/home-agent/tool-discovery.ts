@@ -4,7 +4,6 @@ import { credential, credentialMember } from '@sim/db/schema'
 import { and, desc, eq } from 'drizzle-orm'
 import type { ToolInput } from '@/executor/handlers/agent/types'
 import { getNangoToken } from '@/app/api/auth/oauth/utils'
-import { getComposioClient } from '@/lib/composio/client'
 import { env } from '@/lib/core/config/env'
 import { getNangoClient } from '@/lib/nango/client'
 import { getNangoProviderConfigKey } from '@/lib/nango/providers'
@@ -354,21 +353,43 @@ export function credentialsToToolInputs(
 
 /**
  * Discovers Composio-connected apps for a user and returns ToolInputs.
- * Fetches connections from Composio, resolves access tokens from connectionParams,
- * and maps to the same tool definitions used by Nango credentials.
+ * Calls the Composio REST API directly (the SDK strips connectionParams
+ * which contain the OAuth tokens we need).
  */
 export async function discoverComposioTools(userId: string): Promise<ToolInput[]> {
-  const composio = getComposioClient()
-  if (!composio) return []
+  if (!env.COMPOSIO_API_KEY) return []
 
   try {
-    const entity = composio.getEntity(userId)
-    const connections = await entity.getConnections()
-    const activeConnections = connections.filter(
+    // Fetch connections directly from Composio API — the SDK's entity.getConnections()
+    // doesn't reliably include connectionParams with access tokens.
+    const resp = await fetch(
+      `https://backend.composio.dev/api/v1/connectedAccounts?user_uuid=${encodeURIComponent(userId)}`,
+      { headers: { 'x-api-key': env.COMPOSIO_API_KEY } }
+    )
+    if (!resp.ok) {
+      logger.warn(`Composio connections API returned ${resp.status}`)
+      return []
+    }
+
+    const data = (await resp.json()) as {
+      items: Array<{
+        id: string
+        appName?: string
+        appUniqueId?: string
+        status: string
+        isDisabled?: boolean
+        connectionParams?: Record<string, unknown>
+      }>
+    }
+
+    const activeConnections = (data.items || []).filter(
       (c) => c.status === 'ACTIVE' && !c.isDisabled
     )
 
-    if (activeConnections.length === 0) return []
+    if (activeConnections.length === 0) {
+      logger.info('Composio: no active connections found')
+      return []
+    }
 
     const tools: ToolInput[] = []
     const seenProviders = new Set<string>()
@@ -382,35 +403,15 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
       const providerTools = PROVIDER_TOOLS[providerId]
       if (!providerTools) continue
 
-      // Fetch a refreshed access token via Composio's /info endpoint.
-      // The public SDK only exposes stale connectionParams; the /info
-      // endpoint triggers a server-side token refresh and returns current credentials.
-      let accessToken: string | undefined
-      try {
-        const resp = await fetch(
-          `https://backend.composio.dev/api/v1/connectedAccounts/${conn.id}/info`,
-          { headers: { 'x-api-key': env.COMPOSIO_API_KEY! } }
-        )
-        if (resp.ok) {
-          const info = (await resp.json()) as Record<string, unknown>
-          // The /info response nests credentials under different shapes
-          const headers = info.headers as Record<string, string> | undefined
-          const params = info.connectionParams as Record<string, unknown> | undefined
-          accessToken =
-            headers?.Authorization?.replace(/^Bearer\s+/i, '') ||
-            (params?.access_token as string) ||
-            (params?.accessToken as string) ||
-            (params?.token as string) ||
-            undefined
-        } else {
-          logger.warn(`Composio /info returned ${resp.status} for ${appName} (${conn.id})`)
-        }
-      } catch (err) {
-        logger.warn(`Failed to get Composio token for ${appName} (${conn.id})`, err)
-      }
+      const params = conn.connectionParams
+      const accessToken =
+        (params?.access_token as string) ||
+        (params?.accessToken as string) ||
+        (params?.token as string) ||
+        undefined
 
       if (!accessToken) {
-        logger.warn(`No access token available for Composio connection ${appName}, skipping`)
+        logger.warn(`No access token in connectionParams for ${appName} (${conn.id})`)
         continue
       }
 
