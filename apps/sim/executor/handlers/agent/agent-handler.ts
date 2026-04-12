@@ -226,9 +226,22 @@ export class AgentBlockHandler implements BlockHandler {
     const mcpResults = await this.processMcpToolsBatched(ctx, mcpTools)
 
     const allTools = [...otherResults, ...mcpResults]
-    return allTools.filter(
+    const nonNull = allTools.filter(
       (tool): tool is NonNullable<typeof tool> => tool !== null && tool !== undefined
     )
+
+    // Deduplicate by tool id — the Anthropic API rejects requests with duplicate tool names
+    const seenIds = new Set<string>()
+    return nonNull.filter((tool) => {
+      const id = tool.id
+      if (!id) return true
+      if (seenIds.has(id)) {
+        logger.warn(`Dropping duplicate tool: ${id}`)
+        return false
+      }
+      seenIds.add(id)
+      return true
+    })
   }
 
   private async createCustomTool(ctx: ExecutionContext, tool: ToolInput): Promise<any> {
