@@ -13,7 +13,7 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   profile: 'Access your basic profile information',
   email: 'View your email address',
   offline_access: 'Maintain access when you are not actively using the app',
-  'mcp:tools': 'Use Neato_SIM workflows and tools on your behalf',
+  'mcp:tools': 'Use Neato_Pilot workflows and tools on your behalf',
 } as const
 
 interface ClientInfo {
@@ -179,7 +179,7 @@ export default function OAuthConsentPage() {
         <ArrowLeftRight className='h-5 w-5 text-[var(--landing-text-muted)]' />
         <Image
           src='/new/logo/colorized-bg.svg'
-          alt='Sim'
+          alt='Neato_Pilot'
           width={48}
           height={48}
           className='rounded-[10px]'

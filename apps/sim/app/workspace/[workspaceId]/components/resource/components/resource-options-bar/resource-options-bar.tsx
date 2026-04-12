@@ -89,8 +89,8 @@ export const ResourceOptionsBar = memo(function ResourceOptionsBar({
   if (!hasContent) return null
 
   return (
-    <div className={cn('border-[var(--border)] border-b py-2.5', search ? 'px-6' : 'px-4')}>
-      <div className='flex items-center justify-between'>
+    <div className={cn('border-[var(--border)] border-b py-2.5', search ? 'px-3 sm:px-6' : 'px-3 sm:px-4')}>
+      <div className='flex items-center justify-between gap-2'>
         {search && <SearchSection search={search} />}
         <div className='flex items-center gap-1.5'>
           {extras}

@@ -32,10 +32,10 @@ export function Inbox() {
       <div className='flex h-full flex-col items-center justify-center gap-4 py-20'>
         <div className='text-center'>
           <h3 className='font-medium text-[16px] text-[var(--text-primary)]'>
-            Neato_SIM Mailer requires an active Max plan
+            Neato_Pilot Mailer requires an active Max plan
           </h3>
           <p className='mt-1.5 text-[14px] text-[var(--text-muted)]'>
-            Upgrade to Max and ensure billing is active to receive tasks via email and let Neato_SIM work
+            Upgrade to Max and ensure billing is active to receive tasks via email and let Neato_Pilot work
             on your behalf.
           </p>
         </div>

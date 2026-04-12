@@ -146,6 +146,7 @@ export const env = createEnv({
 
     // Admin API
     ADMIN_API_KEY:                         z.string().min(32).optional(),          // Admin API key for self-hosted GitOps access (generate with: openssl rand -hex 32)
+    ADMIN_EMAIL:                           z.string().email().optional(),          // Email of the initial admin user (used by /api/admin/seed)
 
     // Infrastructure & Deployment
     NEXT_RUNTIME:                          z.string().optional(),                  // Next.js runtime environment

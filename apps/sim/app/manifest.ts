@@ -5,10 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
   const brand = getBrandConfig()
 
   return {
-    name: brand.name === 'Neato_SIM' ? 'Neato_SIM — Build AI Agents & Run Your Agentic Workforce' : brand.name,
+    name: brand.name === 'Neato_Pilot' ? 'Neato_Pilot — Build AI Agents & Run Your Agentic Workforce' : brand.name,
     short_name: brand.name,
     description:
-      'Neato_SIM is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to orchestrate agentic workflows.',
+      'Neato_Pilot is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to orchestrate agentic workflows.',
     start_url: '/',
     scope: '/',
     display: 'standalone',

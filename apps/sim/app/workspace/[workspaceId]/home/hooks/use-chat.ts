@@ -100,6 +100,8 @@ const STATE_TO_STATUS: Record<string, ToolCallStatus> = {
 const DEPLOY_TOOL_NAMES = new Set(['deploy_api', 'deploy_chat', 'deploy_mcp', 'redeploy'])
 const RECONNECT_TAIL_ERROR =
   'Live reconnect failed before the stream finished. The latest response may be incomplete.'
+const STREAM_NOT_FOUND_ERROR = 'Stream no longer exists'
+const STREAM_GONE_STATUSES = new Set([404, 410])
 const TERMINAL_STREAM_STATUSES = new Set(['complete', 'error', 'cancelled'])
 const MAX_RECONNECT_ATTEMPTS = 10
 const RECONNECT_BASE_DELAY_MS = 1000
@@ -633,6 +635,9 @@ export function useChat(
       )
 
       if (!response.ok) {
+        if (STREAM_GONE_STATUSES.has(response.status)) {
+          throw new Error(STREAM_NOT_FOUND_ERROR)
+        }
         throw new Error(`Stream resume batch failed: ${response.status}`)
       }
 
@@ -719,6 +724,9 @@ export function useChat(
             { signal: activeAbortController.signal }
           )
           if (!sseRes.ok || !sseRes.body) {
+            if (STREAM_GONE_STATUSES.has(sseRes.status)) {
+              throw new Error(STREAM_NOT_FOUND_ERROR)
+            }
             throw new Error(RECONNECT_TAIL_ERROR)
           }
 
@@ -1863,6 +1871,16 @@ export function useChat(
           return true
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') return true
+
+          if (err instanceof Error && err.message === STREAM_NOT_FOUND_ERROR) {
+            logger.info('Stream no longer exists, stopping reconnection', { streamId })
+            setIsReconnecting(false)
+            setIsSending(false)
+            sendingRef.current = false
+            abortControllerRef.current = null
+            return true
+          }
+
           logger.warn('Reconnect attempt failed', {
             streamId,
             attempt: attempt + 1,

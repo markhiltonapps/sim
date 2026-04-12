@@ -16,6 +16,7 @@ export const useSidebarStore = create<SidebarState>()(
       sidebarWidth: SIDEBAR_WIDTH.DEFAULT,
       isCollapsed: false,
       isResizing: false,
+      isMobileOpen: false,
       _hasHydrated: false,
       setWorkspaceDropdownOpen: (isOpen) => set({ workspaceDropdownOpen: isOpen }),
       setSidebarWidth: (width) => {
@@ -33,6 +34,7 @@ export const useSidebarStore = create<SidebarState>()(
       setIsResizing: (isResizing) => {
         set({ isResizing })
       },
+      setMobileOpen: (isOpen) => set({ isMobileOpen: isOpen }),
       setHasHydrated: (hasHydrated) => set({ _hasHydrated: hasHydrated }),
     }),
     {

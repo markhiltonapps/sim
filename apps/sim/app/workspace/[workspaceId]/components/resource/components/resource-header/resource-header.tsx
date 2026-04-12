@@ -69,11 +69,11 @@ export const ResourceHeader = memo(function ResourceHeader({
     <div
       className={cn(
         'border-[var(--border)] border-b',
-        hasBreadcrumbs ? 'px-4 py-[8.5px]' : 'px-6 py-2.5'
+        hasBreadcrumbs ? 'px-3 py-[8.5px] sm:px-4' : 'px-3 py-2.5 sm:px-6'
       )}
     >
-      <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-3'>
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex min-w-0 items-center gap-2 sm:gap-3'>
           {hasBreadcrumbs ? (
             breadcrumbs.map((crumb, i) => (
               <Fragment key={i}>

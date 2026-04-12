@@ -4,7 +4,7 @@ import type { BrandConfig } from './types'
  * Default brand configuration values
  */
 export const defaultBrandConfig: BrandConfig = {
-  name: 'Neato_SIM',
+  name: 'Neato_Pilot',
   logoUrl: undefined,
   faviconUrl: undefined,
   customCssUrl: undefined,

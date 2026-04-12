@@ -60,14 +60,21 @@ export function Home({ chatId }: HomeProps = {}) {
 
   const queryClient = useQueryClient()
   const [isInputEntering, setIsInputEntering] = useState(false)
-  const [isAgentMode, setIsAgentMode] = useState(() => {
-    if (!NANGO_ENABLED) return false
-    try {
-      return localStorage.getItem('sim:agentMode') === 'true'
-    } catch {
-      return false
+  const [isAgentMode, setIsAgentMode] = useState(false)
+  const [isAgentModeHydrated, setIsAgentModeHydrated] = useState(false)
+
+  useEffect(() => {
+    if (!NANGO_ENABLED) {
+      setIsAgentModeHydrated(true)
+      return
     }
-  })
+    try {
+      if (localStorage.getItem('sim:agentMode') === 'true') {
+        setIsAgentMode(true)
+      }
+    } catch {}
+    setIsAgentModeHydrated(true)
+  }, [])
   const [isConnectAppsOpen, setIsConnectAppsOpen] = useState(false)
   const [inlineConnectServiceId, setInlineConnectServiceId] = useState<string | null>(null)
 
@@ -393,14 +400,18 @@ export function Home({ chatId }: HomeProps = {}) {
     return () => ro.disconnect()
   }, [hasMessages])
 
+  if (!isAgentModeHydrated) {
+    return <div className='h-full bg-[var(--bg)]' />
+  }
+
   if (!hasMessages && !chatId && (!isAgentMode || agentChat.messages.length === 0)) {
     return (
       <>
         <div className='h-full overflow-y-auto bg-[var(--bg)] [scrollbar-gutter:stable_both-edges]'>
-          <div className='flex min-h-full flex-col items-center justify-center px-6 pb-[2vh]'>
+          <div className='flex min-h-full flex-col items-center justify-center px-3 pb-[2vh] sm:px-6'>
             <h1
               data-tour='home-greeting'
-              className='mb-6 max-w-[42rem] text-balance font-[430] font-season text-[32px] text-[var(--text-primary)] tracking-[-0.02em]'
+              className='mb-4 max-w-[42rem] text-balance font-[430] font-season text-[24px] text-[var(--text-primary)] tracking-[-0.02em] sm:mb-6 sm:text-[32px]'
             >
               What should we get done
               {session?.user?.name ? `, ${session.user.name.split(' ')[0]}` : ''}?
@@ -429,7 +440,7 @@ export function Home({ chatId }: HomeProps = {}) {
 
             {/* Agent mode toggle + Connect Apps */}
             {NANGO_ENABLED && (
-              <div className='mt-3 flex items-center gap-2'>
+              <div className='mt-3 flex flex-wrap items-center justify-center gap-2'>
                 <button
                   type='button'
                   onClick={() => setAgentMode(!isAgentMode)}
@@ -461,7 +472,7 @@ export function Home({ chatId }: HomeProps = {}) {
           <div
             ref={templateRef}
             data-tour='home-templates'
-            className='-mt-[30vh] mx-auto w-full max-w-[68rem] px-4 pb-8 sm:px-6 lg:px-10'
+            className='-mt-[15vh] mx-auto w-full max-w-[68rem] px-3 pb-8 sm:-mt-[30vh] sm:px-6 lg:px-10'
           >
             {!isAgentMode && <TemplatePrompts onSelect={handleSubmit} />}
           </div>
@@ -483,29 +494,33 @@ export function Home({ chatId }: HomeProps = {}) {
   if (isAgentMode) {
     return (
       <>
-        <div className='relative flex h-full flex-col bg-[var(--bg)]'>
+        <div className='relative flex h-full flex-col bg-[#F8FAFC] font-manrope'>
           {/* Agent mode header */}
-          <div className='flex items-center justify-between border-b border-[var(--border)] px-4 py-2'>
-            <div className='flex items-center gap-2'>
-              <Plug className='h-[14px] w-[14px] text-[var(--text-secondary)]' />
-              <span className='text-[13px] font-medium text-[var(--text-primary)]'>Agent Mode</span>
-              {connectedServices.length > 0 && (
-                <span className='text-[11px] text-[var(--text-secondary)]'>
-                  · {connectedServices.map((s) => s.displayName || s.providerId).join(', ')}
-                </span>
-              )}
+          <div className='flex items-center justify-between border-b border-[#E2E8F0] bg-white px-3 py-2 shadow-sm sm:px-5 sm:py-2.5'>
+            <div className='flex items-center gap-2 sm:gap-3'>
+              <div className='flex h-[28px] w-[28px] items-center justify-center rounded-lg bg-[#3F51B5]'>
+                <Plug className='h-[13px] w-[13px] text-white' />
+              </div>
+              <div className='flex flex-col'>
+                <span className='text-[13px] font-semibold tracking-[-0.01em] text-[#0F172A]'>Agent Mode</span>
+                {connectedServices.length > 0 && (
+                  <span className='hidden text-[11px] text-[#94A3B8] sm:block'>
+                    {connectedServices.map((s) => s.displayName || s.providerId).join(' · ')}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-1 sm:gap-2'>
               {NANGO_ENABLED && (
-                <Button
-                  size='sm'
-                  variant='ghost'
+                <button
+                  type='button'
                   onClick={() => setIsConnectAppsOpen(true)}
-                  className='h-[26px] px-2 text-[11px]'
+                  className='flex h-[30px] items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-2 text-[12px] font-medium text-[#475569] transition-colors hover:bg-[#F1F5F9] sm:px-3'
                 >
-                  <Plug className='h-[10px] w-[10px]' />
-                  Connect apps
-                </Button>
+                  <Plug className='h-[11px] w-[11px]' />
+                  <span className='hidden sm:inline'>Connect Apps</span>
+                  <span className='sm:hidden'>Apps</span>
+                </button>
               )}
               <button
                 type='button'
@@ -513,9 +528,9 @@ export function Home({ chatId }: HomeProps = {}) {
                   setAgentMode(false)
                   agentChat.clearMessages()
                 }}
-                className='text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                className='flex h-[30px] items-center rounded-lg px-2 text-[12px] font-medium text-[#94A3B8] transition-colors hover:text-[#475569] sm:px-3'
               >
-                Exit agent
+                Exit
               </button>
             </div>
           </div>
@@ -524,6 +539,7 @@ export function Home({ chatId }: HomeProps = {}) {
             <AgentChat
               messages={agentChat.messages}
               isSending={agentChat.isSending}
+              statusMessage={agentChat.statusMessage}
               onSubmit={(text) => agentChat.sendMessage(text)}
               onStopGeneration={agentChat.stopGeneration}
               onConnectService={NANGO_ENABLED ? handleConnectFromChat : undefined}
@@ -560,8 +576,8 @@ export function Home({ chatId }: HomeProps = {}) {
 
   return (
     <>
-      <div className='relative flex h-full bg-[var(--bg)]'>
-        <div className='flex h-full min-w-[320px] flex-1 flex-col'>
+      <div className='relative flex h-full flex-col bg-[var(--bg)] md:flex-row'>
+        <div className='flex h-full min-w-0 flex-1 flex-col md:min-w-[320px]'>
           <MothershipChat
             messages={messages}
             isSending={isSending}
@@ -585,7 +601,7 @@ export function Home({ chatId }: HomeProps = {}) {
 
         {/* Resize handle — zero-width flex child whose absolute child straddles the border */}
         {!isResourceCollapsed && (
-          <div className='relative z-20 w-0 flex-none'>
+          <div className='relative z-20 hidden w-0 flex-none md:block'>
             <div
               className='absolute inset-y-0 left-[-4px] w-[8px] cursor-ew-resize'
               role='separator'
@@ -596,25 +612,27 @@ export function Home({ chatId }: HomeProps = {}) {
           </div>
         )}
 
-        <MothershipView
-          ref={mothershipRef}
-          workspaceId={workspaceId}
-          chatId={resolvedChatId}
-          resources={resources}
-          activeResourceId={activeResourceId}
-          onSelectResource={setActiveResourceId}
-          onAddResource={addResource}
-          onRemoveResource={removeResource}
-          onReorderResources={reorderResources}
-          onCollapse={collapseResource}
-          isCollapsed={isResourceCollapsed}
-          streamingFile={streamingFile}
-          genericResourceData={genericResourceData}
-          className={skipResourceTransition ? '!transition-none' : undefined}
-        />
+        <div className='hidden md:contents'>
+          <MothershipView
+            ref={mothershipRef}
+            workspaceId={workspaceId}
+            chatId={resolvedChatId}
+            resources={resources}
+            activeResourceId={activeResourceId}
+            onSelectResource={setActiveResourceId}
+            onAddResource={addResource}
+            onRemoveResource={removeResource}
+            onReorderResources={reorderResources}
+            onCollapse={collapseResource}
+            isCollapsed={isResourceCollapsed}
+            streamingFile={streamingFile}
+            genericResourceData={genericResourceData}
+            className={skipResourceTransition ? '!transition-none' : undefined}
+          />
+        </div>
 
         {isResourceCollapsed && (
-          <div className='absolute top-[8.5px] right-[16px]'>
+          <div className='absolute top-[8.5px] right-[16px] hidden md:block'>
             <button
               type='button'
               onClick={expandResource}

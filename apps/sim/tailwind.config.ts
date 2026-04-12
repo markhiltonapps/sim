@@ -13,6 +13,7 @@ export default {
     extend: {
       fontFamily: {
         season: ['var(--font-season)'],
+        manrope: ['var(--font-manrope)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         body: [
           'ui-sans-serif',
           '-apple-system',

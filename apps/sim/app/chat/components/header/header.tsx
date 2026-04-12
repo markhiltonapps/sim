@@ -68,8 +68,8 @@ export function ChatHeader({ chatConfig, starCount }: ChatHeaderProps) {
           >
             <Image
               src='/logo/sim-landing.svg'
-              alt='Sim'
-              width={71}
+              alt='Neato_Pilot'
+              width={160}
               height={22}
               className='h-[22px] w-auto'
               priority

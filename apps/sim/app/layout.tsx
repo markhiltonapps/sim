@@ -12,6 +12,7 @@ import { QueryProvider } from '@/app/_shell/providers/query-provider'
 import { SessionProvider } from '@/app/_shell/providers/session-provider'
 import { ThemeProvider } from '@/app/_shell/providers/theme-provider'
 import { TooltipProvider } from '@/app/_shell/providers/tooltip-provider'
+import { manrope } from '@/app/_styles/fonts/manrope/manrope'
 import { season } from '@/app/_styles/fonts/season/season'
 
 export const viewport: Viewport = {
@@ -246,7 +247,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
         <PublicEnvScript />
       </head>
-      <body className={`${season.variable} font-season`} suppressHydrationWarning>
+      <body className={`${season.variable} ${manrope.variable} font-season`} suppressHydrationWarning>
         {/* Google Tag Manager (noscript) — hosted only */}
         {isHosted && (
           <noscript>

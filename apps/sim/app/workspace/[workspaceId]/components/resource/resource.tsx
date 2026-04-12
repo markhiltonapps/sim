@@ -281,7 +281,7 @@ export const ResourceTable = memo(function ResourceTable({
                   return (
                     <th
                       key={col.id}
-                      className='h-10 px-6 py-1.5 text-left align-middle font-base text-[var(--text-muted)] text-caption'
+                      className='h-10 px-3 py-1.5 text-left align-middle font-base text-[var(--text-muted)] text-caption sm:px-6'
                     >
                       {col.header}
                     </th>
@@ -507,7 +507,7 @@ const DataRow = memo(function DataRow({
       {columns.map((col, colIdx) => {
         const cell = row.cells[col.id]
         return (
-          <td key={col.id} className='px-6 py-2.5 align-middle'>
+          <td key={col.id} className='px-3 py-2.5 align-middle sm:px-6'>
             <CellContent
               icon={cell?.icon}
               label={cell?.label || EMPTY_CELL_PLACEHOLDER}
@@ -620,7 +620,7 @@ const DataTableSkeleton = memo(function DataTableSkeleton({
                   </td>
                 )}
                 {columns.map((col, colIdx) => (
-                  <td key={col.id} className='px-6 py-2.5 align-middle'>
+                  <td key={col.id} className='px-3 py-2.5 align-middle sm:px-6'>
                     <span className='flex min-h-[21px] items-center gap-3'>
                       {colIdx === 0 && <Skeleton className='h-[14px] w-[14px] rounded-xs' />}
                       <Skeleton className='h-[14px] w-[128px]' />

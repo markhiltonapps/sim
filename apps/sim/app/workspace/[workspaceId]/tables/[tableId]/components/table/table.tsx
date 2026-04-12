@@ -28,6 +28,7 @@ import {
   ArrowRight,
   Calendar as CalendarIcon,
   ChevronDown,
+  Download,
   Fingerprint,
   Pencil,
   Plus,
@@ -1477,6 +1478,29 @@ export function Table({
     setFilterOpen(false)
   }, [])
 
+  const handleExportCsv = useCallback(() => {
+    if (!displayColumns.length || !rows) return
+    const escapeCell = (val: unknown): string => {
+      const str = val == null ? '' : String(val)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+    const header = displayColumns.map((c) => escapeCell(c.name)).join(',')
+    const body = rows.map((row) =>
+      displayColumns.map((col) => escapeCell((row.data as Record<string, unknown>)?.[col.name])).join(',')
+    )
+    const csv = [header, ...body].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${tableData?.name || 'table'}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [displayColumns, rows, tableData?.name])
+
   const columnOptions = useMemo<ColumnOption[]>(
     () =>
       displayColumns.map((col) => ({
@@ -1625,6 +1649,12 @@ export function Table({
             sort={sortConfig}
             onFilterToggle={handleFilterToggle}
             filterActive={filterOpen || !!queryOptions.filter}
+            extras={
+              <Button variant='subtle' className='px-2 py-1 text-caption' onClick={handleExportCsv}>
+                <Download className='mr-1.5 h-[14px] w-[14px] text-[var(--text-icon)]' />
+                Export CSV
+              </Button>
+            }
           />
           {filterOpen && (
             <TableFilter

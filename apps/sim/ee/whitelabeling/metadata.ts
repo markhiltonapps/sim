@@ -9,8 +9,8 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
   const brand = getBrandConfig()
 
   const defaultTitle = brand.name
-  const summaryFull = `Neato_SIM is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to deploy and orchestrate agentic workflows. Create agents, workflows, knowledge bases, tables, and docs. Trusted by over 100,000 builders — from startups to Fortune 500 companies. SOC2 compliant.`
-  const summaryShort = `Neato_SIM is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to deploy and orchestrate agentic workflows.`
+  const summaryFull = `Neato_Pilot is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to deploy and orchestrate agentic workflows. Create agents, workflows, knowledge bases, tables, and docs. Trusted by over 100,000 builders — from startups to Fortune 500 companies. SOC2 compliant.`
+  const summaryShort = `Neato_Pilot is the open-source platform to build AI agents and run your agentic workforce. Connect 1,000+ integrations and LLMs to deploy and orchestrate agentic workflows.`
 
   return {
     title: {

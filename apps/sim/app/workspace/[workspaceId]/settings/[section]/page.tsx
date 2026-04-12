@@ -11,7 +11,7 @@ const SECTION_TITLES: Record<string, string> = {
   secrets: 'Secrets',
   'template-profile': 'Template Profile',
   'access-control': 'Access Control',
-  apikeys: 'Neato_SIM Keys',
+  apikeys: 'Neato_Pilot Keys',
   byok: 'BYOK',
   subscription: 'Subscription',
   team: 'Team',

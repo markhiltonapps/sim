@@ -8,6 +8,62 @@ const logger = createLogger('useAgentChat')
 
 const STORAGE_PREFIX = 'sim:agentChat:'
 
+const TABLE_MARKER_RE = /\[\[TABLE:([\s\S]*?)\]\]/g
+const SCHEDULE_MARKER_RE = /\[\[SCHEDULE:([\s\S]*?)\]\]/g
+const ADD_ROWS_MARKER_RE = /\[\[ADD_ROWS:([\s\S]*?)\]\]/g
+
+const MAX_HISTORY_MESSAGES = 40
+
+/**
+ * Compresses conversation history before sending to the API.
+ * Strips large TABLE/SCHEDULE JSON markers (already persisted server-side)
+ * and limits total message count to prevent token overflow.
+ */
+function compressHistory(
+  messages: Array<{ role: string; content: string }>
+): Array<{ role: string; content: string }> {
+  // Replace heavy markers with short summaries
+  const compressed = messages.map((m) => {
+    let content = m.content
+    content = content.replace(TABLE_MARKER_RE, (_match, json: string) => {
+      try {
+        const parsed = JSON.parse(json)
+        const name = parsed.name || 'table'
+        const rowCount = Array.isArray(parsed.rows) ? parsed.rows.length : 0
+        return `[Table "${name}" created with ${rowCount} rows]`
+      } catch {
+        return '[Table created]'
+      }
+    })
+    content = content.replace(SCHEDULE_MARKER_RE, (_match, json: string) => {
+      try {
+        const parsed = JSON.parse(json)
+        return `[Schedule "${parsed.title || 'task'}" created]`
+      } catch {
+        return '[Schedule created]'
+      }
+    })
+    content = content.replace(ADD_ROWS_MARKER_RE, (_match, json: string) => {
+      try {
+        const parsed = JSON.parse(json)
+        const table = parsed.table || 'table'
+        const rowCount = Array.isArray(parsed.rows) ? parsed.rows.length : 0
+        return `[Added ${rowCount} rows to "${table}"]`
+      } catch {
+        return '[Rows added to table]'
+      }
+    })
+    return { role: m.role, content }
+  })
+
+  // Keep only the most recent messages if history is too long
+  if (compressed.length > MAX_HISTORY_MESSAGES) {
+    return compressed.slice(-MAX_HISTORY_MESSAGES)
+  }
+
+  return compressed
+}
+
 function loadPersistedMessages(workspaceId: string): AgentChatMessage[] {
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}${workspaceId}:messages`)
@@ -50,6 +106,7 @@ export interface AgentChatMessage {
 export interface UseAgentChatReturn {
   messages: AgentChatMessage[]
   isSending: boolean
+  statusMessage: string | null
   sendMessage: (text: string) => Promise<void>
   stopGeneration: () => void
   clearMessages: () => void
@@ -65,6 +122,7 @@ interface UseAgentChatProps {
 export function useAgentChat({ workspaceId, model, onScheduleCreated, onTableCreated }: UseAgentChatProps): UseAgentChatReturn {
   const [messages, setMessages] = useState<AgentChatMessage[]>(() => loadPersistedMessages(workspaceId))
   const [isSending, setIsSending] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<AgentChatMessage[]>(messages)
   messagesRef.current = messages
@@ -121,10 +179,11 @@ export function useAgentChat({ workspaceId, model, onScheduleCreated, onTableCre
 
       try {
         // Build conversation history for the API (exclude the empty assistant placeholder)
-        const history = [...messagesRef.current.filter((m) => m.content), userMessage].map((m) => ({
+        const rawHistory = [...messagesRef.current.filter((m) => m.content), userMessage].map((m) => ({
           role: m.role,
           content: m.content,
         }))
+        const history = compressHistory(rawHistory)
 
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -170,7 +229,10 @@ export function useAgentChat({ workspaceId, model, onScheduleCreated, onTableCre
             try {
               const event = JSON.parse(jsonStr) as { type: string; content?: string; error?: string }
 
-              if (event.type === 'delta' && event.content) {
+              if (event.type === 'status' && event.content) {
+                setStatusMessage(event.content)
+              } else if (event.type === 'delta' && event.content) {
+                setStatusMessage(null)
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId ? { ...m, content: m.content + event.content } : m
@@ -206,11 +268,12 @@ export function useAgentChat({ workspaceId, model, onScheduleCreated, onTableCre
       } finally {
         isSendingRef.current = false
         setIsSending(false)
+        setStatusMessage(null)
         abortControllerRef.current = null
       }
     },
     [workspaceId, model]
   )
 
-  return { messages, isSending, sendMessage, stopGeneration, clearMessages }
+  return { messages, isSending, statusMessage, sendMessage, stopGeneration, clearMessages }
 }

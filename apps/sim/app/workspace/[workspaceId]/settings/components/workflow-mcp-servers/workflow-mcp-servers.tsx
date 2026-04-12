@@ -463,7 +463,7 @@ function ServerDetailView({ workspaceId, serverId, onBack }: ServerDetailViewPro
                     <ButtonGroupItem value='claude-code'>Claude Code</ButtonGroupItem>
                     <ButtonGroupItem value='claude-desktop'>Claude Desktop</ButtonGroupItem>
                     <ButtonGroupItem value='vscode'>VS Code</ButtonGroupItem>
-                    <ButtonGroupItem value='sim'>Neato_SIM</ButtonGroupItem>
+                    <ButtonGroupItem value='sim'>Neato_Pilot</ButtonGroupItem>
                   </ButtonGroup>
                 </div>
 
@@ -906,7 +906,7 @@ function ServerDetailView({ workspaceId, serverId, onBack }: ServerDetailViewPro
               <p className='text-[var(--text-muted)] text-xs'>
                 {editServerIsPublic
                   ? 'Anyone with the URL can call this server without authentication'
-                  : 'Requests must include your Neato_SIM API key in the X-API-Key header'}
+                  : 'Requests must include your Neato_Pilot API key in the X-API-Key header'}
               </p>
             </div>
           </ModalBody>

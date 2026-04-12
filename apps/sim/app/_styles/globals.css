@@ -120,6 +120,34 @@ html[data-sidebar-collapsed] .sidebar-container .sidebar-collapse-btn {
   transition: none;
 }
 
+/** Mobile sidebar drawer: force full-width and never collapsed */
+.mobile-sidebar-drawer .sidebar-container {
+  width: 100% !important;
+  transition: none;
+}
+
+.mobile-sidebar-drawer .sidebar-container[data-collapsed] {
+  animation: none;
+}
+
+.mobile-sidebar-drawer .sidebar-container span,
+.mobile-sidebar-drawer .sidebar-container .text-small {
+  opacity: 1;
+}
+
+.mobile-sidebar-drawer .sidebar-collapse-hide {
+  opacity: 1;
+}
+
+.mobile-sidebar-drawer .sidebar-collapse-show {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mobile-sidebar-drawer .sidebar-collapse-btn {
+  display: none;
+}
+
 .panel-container {
   width: var(--panel-width);
 }

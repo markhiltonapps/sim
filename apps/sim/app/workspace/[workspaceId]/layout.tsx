@@ -6,6 +6,8 @@ import { ProviderModelsLoader } from '@/app/workspace/[workspaceId]/providers/pr
 import { SettingsLoader } from '@/app/workspace/[workspaceId]/providers/settings-loader'
 import { WorkspacePermissionsProvider } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { WorkspaceScopeSync } from '@/app/workspace/[workspaceId]/providers/workspace-scope-sync'
+import { MobileHeader } from '@/app/workspace/[workspaceId]/components/mobile-header'
+import { MobileSidebarOverlay } from '@/app/workspace/[workspaceId]/components/mobile-sidebar-overlay'
 import { Sidebar } from '@/app/workspace/[workspaceId]/w/components/sidebar/sidebar'
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -18,12 +20,17 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           <ImpersonationBanner />
           <WorkspacePermissionsProvider>
             <WorkspaceScopeSync />
+            {/* Mobile header — visible only on small screens */}
+            <MobileHeader />
             <div className='flex min-h-0 flex-1'>
-              <div className='shrink-0' suppressHydrationWarning>
+              {/* Desktop sidebar — hidden on mobile */}
+              <div className='hidden shrink-0 md:block' suppressHydrationWarning>
                 <Sidebar />
               </div>
-              <div className='flex min-w-0 flex-1 flex-col p-[8px] pl-0'>
-                <div className='flex-1 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--bg)]'>
+              {/* Mobile sidebar overlay drawer */}
+              <MobileSidebarOverlay />
+              <div className='flex min-w-0 flex-1 flex-col p-0 md:p-[8px] md:pl-0'>
+                <div className='flex-1 overflow-hidden md:rounded-[8px] md:border md:border-[var(--border)] bg-[var(--bg)]'>
                   {children}
                 </div>
               </div>

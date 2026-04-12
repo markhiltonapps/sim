@@ -132,7 +132,7 @@ export function ApiKeys() {
             strokeWidth={2}
           />
           <Input
-            placeholder='Search Neato_SIM keys...'
+            placeholder='Search Neato_Pilot keys...'
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className='h-auto flex-1 border-0 bg-transparent p-0 font-base leading-none placeholder:text-[var(--text-tertiary)] focus-visible:ring-0 focus-visible:ring-offset-0'
@@ -183,7 +183,7 @@ export function ApiKeys() {
                   <div className='font-medium text-[var(--text-secondary)] text-sm'>Workspace</div>
                   {workspaceKeys.length === 0 ? (
                     <div className='text-[var(--text-muted)] text-sm'>
-                      No workspace Neato_SIM keys yet
+                      No workspace Neato_Pilot keys yet
                     </div>
                   ) : (
                     workspaceKeys.map((key) => (
@@ -285,7 +285,7 @@ export function ApiKeys() {
                         </div>
                         {isConflict && (
                           <div className='text-[var(--text-error)] text-small leading-tight'>
-                            Workspace Neato_SIM key with the same name overrides this. Rename your
+                            Workspace Neato_Pilot key with the same name overrides this. Rename your
                             personal key to use it.
                           </div>
                         )}
@@ -301,7 +301,7 @@ export function ApiKeys() {
                 filteredWorkspaceKeys.length === 0 &&
                 (personalKeys.length > 0 || workspaceKeys.length > 0) && (
                   <div className='py-4 text-center text-[var(--text-muted)] text-sm'>
-                    No Neato_SIM keys found matching "{searchTerm}"
+                    No Neato_Pilot keys found matching "{searchTerm}"
                   </div>
                 )}
             </>
@@ -324,7 +324,7 @@ export function ApiKeys() {
           <div className='mt-6 flex items-center justify-between'>
             <div className='flex items-center gap-2'>
               <span className='font-medium text-[var(--text-secondary)] text-sm'>
-                Allow personal Neato_SIM keys
+                Allow personal Neato_Pilot keys
               </span>
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
@@ -376,7 +376,7 @@ export function ApiKeys() {
       {/* Delete Confirmation Dialog */}
       <Modal open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <ModalContent size='sm'>
-          <ModalHeader>Delete Neato_SIM key</ModalHeader>
+          <ModalHeader>Delete Neato_Pilot key</ModalHeader>
           <ModalBody>
             <p className='text-[var(--text-secondary)]'>
               Deleting{' '}
