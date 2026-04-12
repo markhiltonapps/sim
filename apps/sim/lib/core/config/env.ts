@@ -320,6 +320,9 @@ export const env = createEnv({
     ATTIO_CLIENT_ID:                       z.string().optional(),                  // Attio OAuth client ID
     ATTIO_CLIENT_SECRET:                   z.string().optional(),                  // Attio OAuth client secret
 
+    // Composio Unified Auth Layer
+    COMPOSIO_API_KEY:                      z.string().min(1).optional(),           // Composio API key for unified OAuth management
+
     // Nango OAuth Integration Platform
     NANGO_SECRET_KEY:                      z.string().min(1).optional(),           // Nango secret key for server-side token management
     NANGO_BASE_URL:                        z.string().url().optional(),            // Nango server URL (default: https://api.nango.dev for cloud)
