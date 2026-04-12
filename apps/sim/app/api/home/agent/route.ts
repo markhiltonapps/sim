@@ -470,9 +470,9 @@ export async function POST(request: NextRequest): Promise<Response> {
           { type: 'duckduckgo', operation: 'duckduckgo_search', params: {}, usageControl: 'auto' },
         )
 
-        logger.info(`[${requestId}] Discovered ${tools.length} tools from ${credentials.length} credentials`, {
-          toolTypes: tools.map((t) => `${t.type}:${t.operation}`),
-        })
+        console.error(`[HomeAgent] Nango: ${nangoTools.length} tools (${nangoTools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
+        console.error(`[HomeAgent] Composio: ${composioTools.length} tools (${composioTools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
+        console.error(`[HomeAgent] Merged: ${tools.length} tools (${tools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
 
         const apiKey = decryptedEnv.ANTHROPIC_API_KEY
         if (!apiKey) {
