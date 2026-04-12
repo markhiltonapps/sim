@@ -92,21 +92,6 @@ export function FooterCTA() {
       </div>
 
       <div className='mt-8 flex gap-2'>
-        <a
-          href='https://docs.sim.ai'
-          target='_blank'
-          rel='noopener noreferrer'
-          className={`${CTA_BUTTON} border-[var(--landing-border-strong)] text-[var(--landing-text)] transition-colors hover:bg-[var(--landing-bg-elevated)]`}
-          onClick={() =>
-            trackLandingCta({
-              label: 'Docs',
-              section: 'footer_cta',
-              destination: 'https://docs.sim.ai',
-            })
-          }
-        >
-          Docs
-        </a>
         <Link
           href='/signup'
           className={`${CTA_BUTTON} gap-2 border-white bg-white text-black transition-colors hover:border-[#E0E0E0] hover:bg-[#E0E0E0]`}

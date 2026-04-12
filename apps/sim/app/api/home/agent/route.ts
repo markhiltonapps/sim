@@ -1,12 +1,13 @@
 import { db } from '@sim/db'
 import { userTableDefinitions, userTableRows, workflowSchedule } from '@sim/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { createLogger } from '@sim/logger'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/auth'
 import { SSE_HEADERS, encodeSSE } from '@/lib/core/utils/sse'
 import { generateId } from '@/lib/core/utils/uuid'
+import { env } from '@/lib/core/config/env'
 import { getEffectiveDecryptedEnv } from '@/lib/environment/utils'
 import { validateCronExpression } from '@/lib/workflows/schedules/utils'
 import {
@@ -149,6 +150,7 @@ async function createSchedulesFromResponse(
 }
 
 const TABLE_MARKER_RE = /\[\[TABLE:([\s\S]*?)\]\]/g
+const ADD_ROWS_MARKER_RE = /\[\[ADD_ROWS:([\s\S]*?)\]\]/g
 
 interface TableColumn {
   name: string
@@ -239,6 +241,85 @@ async function createTablesFromResponse(
   return createdIds
 }
 
+async function addRowsFromResponse(
+  content: string,
+  workspaceId: string,
+  userId: string,
+  requestId: string
+): Promise<number> {
+  const matches = [...content.matchAll(ADD_ROWS_MARKER_RE)]
+  if (matches.length === 0) return 0
+
+  let totalAdded = 0
+
+  for (const match of matches) {
+    try {
+      let raw = match[1]
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        raw = raw.replace(/\\"/g, '"').replace(/\\\\"/g, '\\"')
+        parsed = JSON.parse(raw)
+      }
+
+      const tableName = String(parsed.table || '').trim()
+      const rows = parsed.rows as Array<Record<string, unknown>> | undefined
+
+      if (!tableName || !rows || !Array.isArray(rows) || rows.length === 0) {
+        logger.warn(`[${requestId}] Skipping ADD_ROWS — missing table name or rows`)
+        continue
+      }
+
+      // Look up the table by name within the workspace (non-archived only)
+      const [existingTable] = await db
+        .select({ id: userTableDefinitions.id, rowCount: userTableDefinitions.rowCount })
+        .from(userTableDefinitions)
+        .where(
+          and(
+            eq(userTableDefinitions.workspaceId, workspaceId),
+            eq(userTableDefinitions.name, tableName),
+            isNull(userTableDefinitions.archivedAt)
+          )
+        )
+        .limit(1)
+
+      if (!existingTable) {
+        logger.warn(`[${requestId}] ADD_ROWS: table "${tableName}" not found in workspace ${workspaceId}`)
+        continue
+      }
+
+      const now = new Date()
+      const startPosition = existingTable.rowCount
+
+      const rowValues = rows.map((rowData, idx) => ({
+        id: generateId(),
+        tableId: existingTable.id,
+        workspaceId,
+        data: rowData,
+        position: startPosition + idx,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: userId,
+      }))
+
+      await db.insert(userTableRows).values(rowValues)
+
+      await db
+        .update(userTableDefinitions)
+        .set({ rowCount: startPosition + rows.length, updatedAt: now })
+        .where(eq(userTableDefinitions.id, existingTable.id))
+
+      totalAdded += rows.length
+      logger.info(`[${requestId}] Added ${rows.length} rows to table "${tableName}" (${existingTable.id})`)
+    } catch (err) {
+      logger.error(`[${requestId}] Failed to add rows from agent response:`, err)
+    }
+  }
+
+  return totalAdded
+}
+
 const FAST_MODEL = 'claude-haiku-4-5-20251001'
 const POWERFUL_MODEL = 'claude-sonnet-4-6'
 
@@ -267,8 +348,9 @@ function selectModel(
     /\b(write me a|draft|compose|create a .*(report|document|presentation|proposal))\b/,
     // Scheduling (needs to produce correct JSON markers)
     /\b(schedule|every (morning|day|week|monday|tuesday|wednesday|thursday|friday)|recurring|cron|remind me)\b/,
-    // Table creation (needs to produce correct JSON markers)
+    // Table creation or adding rows (needs to produce correct JSON markers)
     /\b(create a table|make a (table|spreadsheet|tracker)|build a .*(table|database|tracker))\b/,
+    /\b(add .*(rows?|leads?|entries|records|data|more)|more .*(leads?|rows?|entries|records)|append|insert .* (to|into))\b/,
     // Multi-tool orchestration
     /\b(check my .* and (then |also )?(send|create|update|forward))\b/,
     // Long messages often mean complex requests
@@ -337,6 +419,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        const emitStatus = (message: string) => {
+          controller.enqueue(encodeSSE({ type: 'status', content: message }))
+        }
+
+        emitStatus('Loading your connected services...')
+
         // Discover tools from connected Nango credentials and load env vars in parallel
         const [credentials, decryptedEnv] = await Promise.all([
           discoverNangoCredentials(workspaceId, userId),
@@ -355,6 +443,13 @@ export async function POST(request: NextRequest): Promise<Response> {
           tools.push(
             { type: 'tavily', operation: 'tavily_search', params: { apiKey: tavilyKey }, usageControl: 'auto' },
             { type: 'tavily', operation: 'tavily_extract', params: { apiKey: tavilyKey }, usageControl: 'auto' },
+          )
+        }
+        // Serper (Google Search) — available when API key is configured
+        const serperKey = decryptedEnv.SERPER_API_KEY || env.SERPER_API_KEY
+        if (serperKey) {
+          tools.push(
+            { type: 'serper', operation: 'serper_search', params: { apiKey: serperKey }, usageControl: 'auto' },
           )
         }
         // DuckDuckGo is free — always available as a fallback
@@ -410,6 +505,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           hubspot: 'HubSpot (contacts, deals)',
           posthog: 'PostHog (analytics queries, feature flags, insights, event capture)',
           tavily: 'Web Search (search the internet, extract content from URLs)',
+          serper: 'Google Search (search Google for web pages, LinkedIn profiles, company info, etc.)',
           duckduckgo: 'DuckDuckGo (quick web lookups and instant answers)',
         }
         const capabilityList = [...blockTypes]
@@ -438,9 +534,27 @@ export async function POST(request: NextRequest): Promise<Response> {
         const wordCount = latestUserMessage.trim().split(/\s+/).length
         const isTrivial = wordCount <= 4 && /^(hi|hey|hello|thanks|thank you|ok|yes|no|sure|good|great|bye|sup|yo|what's up)\b/i.test(latestUserMessage.trim())
 
-        const [mem0Facts, kbContext] = await Promise.all([
+        if (!isTrivial) {
+          emitStatus('Searching your knowledge base and memories...')
+        }
+
+        const [mem0Facts, kbContext, existingTables] = await Promise.all([
           searchMemories(userId, latestUserMessage),
           isTrivial ? Promise.resolve('') : searchKnowledgeBases(userId, workspaceId, latestUserMessage),
+          db
+            .select({
+              name: userTableDefinitions.name,
+              description: userTableDefinitions.description,
+              schema: userTableDefinitions.schema,
+              rowCount: userTableDefinitions.rowCount,
+            })
+            .from(userTableDefinitions)
+            .where(
+              and(
+                eq(userTableDefinitions.workspaceId, workspaceId),
+                isNull(userTableDefinitions.archivedAt)
+              )
+            ),
         ])
         const longTermMemoryBlock = mem0Facts
           ? `\n\nHere is what you remember about this user from previous conversations:\n${mem0Facts}\n\nUse these memories naturally in your responses. If the user corrects any of these facts, acknowledge the correction.`
@@ -464,17 +578,48 @@ Common cron examples: "0 9 * * *" = daily at 9am, "0 9 * * 1" = every Monday 9am
 
 Example: "I'll set up a daily email digest for you at 9am!\n[[SCHEDULE:{\\"title\\":\\"Daily Email Digest\\",\\"prompt\\":\\"Check the user's inbox for new emails from the last 24 hours. Summarize the important ones and send a digest email to the user.\\",\\"cronExpression\\":\\"0 9 * * *\\",\\"timezone\\":\\"America/New_York\\",\\"lifecycle\\":\\"persistent\\"}]]"`
 
+        // Build existing tables context
+        const existingTablesBlock = existingTables.length > 0
+          ? `\n\nThe user has the following existing tables:\n${existingTables.map((t) => {
+              const cols = (t.schema as { columns: TableColumn[] })?.columns || []
+              const colNames = cols.map((c) => c.name).join(', ')
+              return `- "${t.name}" (${t.rowCount} rows) — columns: ${colNames}${t.description ? ` — ${t.description}` : ''}`
+            }).join('\n')}`
+          : ''
+
         const tableInstruction = `\n\nYou can create data tables for the user. When the user asks you to create a table, spreadsheet, tracker, or any structured data store, respond naturally describing what you'll create and include a [[TABLE:json]] marker on its own line with these fields:
 - name: table name using snake_case (letters, numbers, underscores only, must start with a letter or underscore)
 - description: optional description of the table's purpose
 - columns: array of column definitions, each with: name (snake_case), type ("string", "number", "boolean", "date", or "json"), and optionally required (true/false)
 - rows: optional array of initial data rows (objects with column names as keys)
 
-Example: "I'll create a sales leads tracker for you!\n[[TABLE:{\\"name\\":\\"sales_leads\\",\\"description\\":\\"Track potential sales leads and their status\\",\\"columns\\":[{\\"name\\":\\"company\\",\\"type\\":\\"string\\",\\"required\\":true},{\\"name\\":\\"contact_name\\",\\"type\\":\\"string\\"},{\\"name\\":\\"email\\",\\"type\\":\\"string\\"},{\\"name\\":\\"deal_size\\",\\"type\\":\\"number\\"},{\\"name\\":\\"status\\",\\"type\\":\\"string\\"},{\\"name\\":\\"next_followup\\",\\"type\\":\\"date\\"}],\\"rows\\":[{\\"company\\":\\"Acme Corp\\",\\"contact_name\\":\\"John Smith\\",\\"email\\":\\"john@acme.com\\",\\"deal_size\\":50000,\\"status\\":\\"Discovery\\"}]}]]"`
+Example: "I'll create a sales leads tracker for you!\n[[TABLE:{\\"name\\":\\"sales_leads\\",\\"description\\":\\"Track potential sales leads and their status\\",\\"columns\\":[{\\"name\\":\\"company\\",\\"type\\":\\"string\\",\\"required\\":true},{\\"name\\":\\"contact_name\\",\\"type\\":\\"string\\"},{\\"name\\":\\"email\\",\\"type\\":\\"string\\"},{\\"name\\":\\"deal_size\\",\\"type\\":\\"number\\"},{\\"name\\":\\"status\\",\\"type\\":\\"string\\"},{\\"name\\":\\"next_followup\\",\\"type\\":\\"date\\"}],\\"rows\\":[{\\"company\\":\\"Acme Corp\\",\\"contact_name\\":\\"John Smith\\",\\"email\\":\\"john@acme.com\\",\\"deal_size\\":50000,\\"status\\":\\"Discovery\\"}]}]]"
+
+You can also ADD ROWS to an existing table. When the user asks you to add more data to an existing table, use [[ADD_ROWS:json]] with these fields:
+- table: the exact snake_case name of the existing table
+- rows: array of row objects (keys must match the table's column names)
+
+Example: "I'll add those new leads to your table!\n[[ADD_ROWS:{\\"table\\":\\"sales_leads\\",\\"rows\\":[{\\"company\\":\\"NewCo\\",\\"contact_name\\":\\"Jane Doe\\",\\"email\\":\\"jane@newco.com\\",\\"deal_size\\":75000,\\"status\\":\\"Prospecting\\"}]}]]"
+
+IMPORTANT: When adding rows, you MUST include the actual data in the [[ADD_ROWS:...]] marker. Do NOT say you will add data without including it — each message is independent, you cannot "work on it" between messages. Always produce the data in the same response.${existingTablesBlock}`
+
+        const hasWebSearch = blockTypes.has('serper') || blockTypes.has('tavily') || blockTypes.has('duckduckgo')
+        const capabilityGuardrail = hasWebSearch
+          ? `\n\nCRITICAL RULES:
+- You have web search tools available. USE THEM to find real information (LinkedIn profiles, company websites, etc.) instead of making up data. When the user asks you to find LinkedIn URLs or other web data, use your search tools to look them up.
+- When searching for a person's LinkedIn, use a query like: site:linkedin.com "FirstName LastName" "Company". Include the actual URL from the search results.
+- Each response is self-contained. You have NO background processing — you cannot "work on something" between messages. Everything you produce must be in the current response.
+- When you cannot find real data via search, be transparent about which entries are real vs. not found. Never fabricate URLs — either find them or mark them as "not found".
+- For large batches (e.g., finding LinkedIn URLs for 100+ leads), work through as many as you can in a single response. If you run out of space, tell the user how many you completed and that they can ask you to continue with the rest.`
+          : `\n\nCRITICAL RULES:
+- You do NOT have internet access. You cannot browse the web, search Google, look up LinkedIn profiles, visit URLs, or fetch live data. Do not promise to "search for" or "look up" information you cannot access.
+- Each response is self-contained. You have NO background processing — you cannot "work on something" between messages. Everything you produce must be in the current response.
+- If the user asks you to find real-time data (e.g., LinkedIn URLs, live stock prices, current news), be honest: explain that you don't have web access and suggest they connect a relevant service or provide the data themselves.
+- When generating data (leads, contacts, etc.), be transparent that the data is AI-generated/synthetic, not sourced from the internet. If you add columns like URLs or social links, clearly state the values are placeholders unless the user provides real data.`
 
         const systemPrompt = tools.length > 0
-          ? `You are a helpful AI assistant with access to the following connected services. Use the available tools proactively to answer the user's questions and complete tasks.\n\nAvailable capabilities:\n- ${capabilityList}${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}\n\nBe concise and helpful.`
-          : `You are a helpful AI assistant. The user has not connected any external services yet. Encourage them to connect apps to enable email, calendar, and other integrations.${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}`
+          ? `You are a helpful AI assistant with access to the following connected services. Use the available tools proactively to answer the user's questions and complete tasks.\n\nAvailable capabilities:\n- ${capabilityList}${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}${capabilityGuardrail}\n\nBe concise and helpful.`
+          : `You are a helpful AI assistant. The user has not connected any external services yet. Encourage them to connect apps to enable email, calendar, and other integrations.${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}${capabilityGuardrail}`
 
         const conversationId = clientConversationId || `home-agent-${workspaceId}-${userId}`
 
@@ -491,17 +636,19 @@ Example: "I'll create a sales leads tracker for you!\n[[TABLE:{\\"name\\":\\"sal
           messages: messages as Message[],
           tools,
           memoryType: 'sliding_window_tokens',
-          slidingWindowTokens: 32000,
+          slidingWindowTokens: '32000',
           conversationId,
           apiKey,
         }
+
+        emitStatus(selectedModel === FAST_MODEL ? 'Generating response...' : 'Thinking deeply...')
 
         const handler = new AgentBlockHandler()
         const result = await handler.execute(ctx, block, inputs)
 
         let fullResponse = ''
 
-        if (result && 'stream' in result && (result as StreamingExecution).stream) {
+        if (result && typeof result === 'object' && 'stream' in result && (result as StreamingExecution).stream) {
           // Streaming response — pipe chunks as SSE events
           const streamingResult = result as StreamingExecution
           const reader = streamingResult.stream.getReader()
@@ -519,7 +666,7 @@ Example: "I'll create a sales leads tracker for you!\n[[TABLE:{\\"name\\":\\"sal
           } finally {
             reader.releaseLock()
           }
-        } else if (result && 'content' in result) {
+        } else if (result && typeof result === 'object' && 'content' in result) {
           // Non-streaming response — send full content
           fullResponse = String(result.content || '')
           controller.enqueue(encodeSSE({ type: 'delta', content: fullResponse }))
@@ -535,6 +682,14 @@ Example: "I'll create a sales leads tracker for you!\n[[TABLE:{\\"name\\":\\"sal
         if (fullResponse.includes('[[TABLE:')) {
           await createTablesFromResponse(fullResponse, workspaceId, userId, requestId)
           controller.enqueue(encodeSSE({ type: 'table_created' }))
+        }
+
+        // Auto-add rows to existing tables
+        if (fullResponse.includes('[[ADD_ROWS:')) {
+          const addedCount = await addRowsFromResponse(fullResponse, workspaceId, userId, requestId)
+          if (addedCount > 0) {
+            controller.enqueue(encodeSSE({ type: 'table_created' }))
+          }
         }
 
         // Store conversation in mem0 for long-term fact extraction (fire and forget)

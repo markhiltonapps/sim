@@ -1,46 +1,30 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { GithubOutlineIcon } from '@/components/icons'
 import { useSession } from '@/lib/auth/auth-client'
 import { cn } from '@/lib/core/utils/cn'
-import {
-  BlogDropdown,
-  type NavBlogPost,
-} from '@/app/(landing)/components/navbar/components/blog-dropdown'
-import { DocsDropdown } from '@/app/(landing)/components/navbar/components/docs-dropdown'
-import { GitHubStars } from '@/app/(landing)/components/navbar/components/github-stars'
 import { trackLandingCta } from '@/app/(landing)/landing-analytics'
 import { getBrandConfig } from '@/ee/whitelabeling'
-
-type DropdownId = 'docs' | 'blog' | null
 
 interface NavLink {
   label: string
   href: string
-  external?: boolean
-  icon?: 'chevron'
-  dropdown?: 'docs' | 'blog'
 }
 
-const NAV_LINKS: NavLink[] = [
-  { label: 'Docs', href: 'https://docs.sim.ai', external: true, icon: 'chevron', dropdown: 'docs' },
-  { label: 'Blog', href: '/blog', icon: 'chevron', dropdown: 'blog' },
-  { label: 'Pricing', href: '/#pricing' },
-]
+const NAV_LINKS: NavLink[] = [{ label: 'Pricing', href: '/#pricing' }]
 
 const LOGO_CELL = 'flex items-center pl-5 lg:pl-16 pr-5'
 const LINK_CELL = 'flex items-center px-3.5'
 
 interface NavbarProps {
   logoOnly?: boolean
-  blogPosts?: NavBlogPost[]
+  blogPosts?: unknown[]
 }
 
-export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps) {
+export default function Navbar({ logoOnly = false }: NavbarProps) {
   const brand = getBrandConfig()
   const searchParams = useSearchParams()
   const { data: session, isPending: isSessionPending } = useSession()
@@ -48,31 +32,7 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
   const isBrowsingHome = searchParams.has('home')
   const useHomeLinks = isAuthenticated || isBrowsingHome
   const logoHref = useHomeLinks ? '/?home' : '/'
-  const [activeDropdown, setActiveDropdown] = useState<DropdownId>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const openDropdown = useCallback((id: DropdownId) => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-    setActiveDropdown(id)
-  }, [])
-
-  const scheduleClose = useCallback(() => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    closeTimerRef.current = setTimeout(() => {
-      setActiveDropdown(null)
-      closeTimerRef.current = null
-    }, 100)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
@@ -114,8 +74,8 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
         ) : (
           <Image
             src='/logo/sim-landing.svg'
-            alt='Sim'
-            width={71}
+            alt='Neato_Pilot'
+            width={160}
             height={22}
             className='h-[22px] w-auto'
             priority
@@ -126,78 +86,25 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
       {!logoOnly && (
         <>
           <ul className='mt-[0.75px] hidden lg:flex'>
-            {NAV_LINKS.map(({ label, href: rawHref, external, icon, dropdown }) => {
+            {NAV_LINKS.map(({ label, href: rawHref }) => {
               const href =
                 useHomeLinks && rawHref.startsWith('/#') ? `/?home${rawHref.slice(1)}` : rawHref
-              const hasDropdown = !!dropdown
-              const isActive = hasDropdown && activeDropdown === dropdown
-              const linkClass = cn(
-                icon ? `${LINK_CELL} gap-2` : LINK_CELL,
-                'h-[30px] self-center rounded-[5px] transition-colors duration-200 group-hover:bg-[var(--landing-bg-elevated)]'
-              )
-              const chevron = icon === 'chevron' && <NavChevron open={isActive} />
-
-              if (hasDropdown) {
-                return (
-                  <li
-                    key={label}
-                    className='group relative flex'
-                    onMouseEnter={() => openDropdown(dropdown)}
-                    onMouseLeave={scheduleClose}
-                  >
-                    {external ? (
-                      <a
-                        href={href}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        itemProp='url'
-                        className={cn(linkClass, 'cursor-pointer')}
-                      >
-                        {label}
-                        {chevron}
-                      </a>
-                    ) : (
-                      <Link href={href} itemProp='url' className={cn(linkClass, 'cursor-pointer')}>
-                        {label}
-                        {chevron}
-                      </Link>
-                    )}
-
-                    {isActive && (
-                      <div className='-mt-0.5 pointer-events-auto absolute top-full left-0 z-50'>
-                        {dropdown === 'docs' && <DocsDropdown />}
-                        {dropdown === 'blog' && <BlogDropdown posts={blogPosts} />}
-                      </div>
-                    )}
-                  </li>
-                )
-              }
-
               return (
                 <li key={label} className='group flex'>
-                  {external ? (
-                    <a
-                      href={href}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      itemProp='url'
-                      className={linkClass}
-                    >
-                      {label}
-                      {chevron}
-                    </a>
-                  ) : (
-                    <Link href={href} itemProp='url' className={linkClass} aria-label={label}>
-                      {label}
-                      {chevron}
-                    </Link>
-                  )}
+                  <Link
+                    href={href}
+                    itemProp='url'
+                    className={cn(
+                      LINK_CELL,
+                      'h-[30px] self-center rounded-[5px] transition-colors duration-200 group-hover:bg-[var(--landing-bg-elevated)]'
+                    )}
+                    aria-label={label}
+                  >
+                    {label}
+                  </Link>
                 </li>
               )
             })}
-            <li className='group flex'>
-              <GitHubStars />
-            </li>
           </ul>
 
           <div className='hidden flex-1 lg:block' />
@@ -238,7 +145,7 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
                 <Link
                   href='/signup'
                   className='inline-flex h-[30px] items-center gap-[7px] rounded-[5px] border border-[var(--white)] bg-[var(--white)] px-2.5 text-[13.5px] text-black transition-colors hover:border-[#E0E0E0] hover:bg-[#E0E0E0]'
-                  aria-label='Get started with Sim'
+                  aria-label='Get started with Neato_Pilot'
                   onClick={() =>
                     trackLandingCta({
                       label: 'Get started',
@@ -272,46 +179,21 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
             )}
           >
             <ul className='flex flex-col'>
-              {NAV_LINKS.map(({ label, href: rawHref, external }) => {
+              {NAV_LINKS.map(({ label, href: rawHref }) => {
                 const href =
                   useHomeLinks && rawHref.startsWith('/#') ? `/?home${rawHref.slice(1)}` : rawHref
                 return (
                   <li key={label} className='border-[var(--landing-border)] border-b'>
-                    {external ? (
-                      <a
-                        href={href}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='flex items-center justify-between px-5 py-3.5 text-[var(--landing-text)] transition-colors active:bg-[var(--landing-bg-elevated)]'
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {label}
-                        <ExternalArrowIcon />
-                      </a>
-                    ) : (
-                      <Link
-                        href={href}
-                        className='flex items-center px-5 py-3.5 text-[var(--landing-text)] transition-colors active:bg-[var(--landing-bg-elevated)]'
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {label}
-                      </Link>
-                    )}
+                    <Link
+                      href={href}
+                      className='flex items-center px-5 py-3.5 text-[var(--landing-text)] transition-colors active:bg-[var(--landing-bg-elevated)]'
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {label}
+                    </Link>
                   </li>
                 )
               })}
-              <li className='border-[var(--landing-border)] border-b'>
-                <a
-                  href='https://github.com/simstudioai/sim'
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='flex items-center gap-2 px-5 py-3.5 text-[var(--landing-text)] transition-colors active:bg-[var(--landing-bg-elevated)]'
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <GithubOutlineIcon className='h-[14px] w-[14px]' />
-                  GitHub
-                </a>
-              </li>
             </ul>
 
             <div
@@ -357,7 +239,7 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
                       })
                       setMobileMenuOpen(false)
                     }}
-                    aria-label='Get started with Sim'
+                    aria-label='Get started with Neato_Pilot'
                   >
                     Get started
                   </Link>
@@ -368,50 +250,6 @@ export default function Navbar({ logoOnly = false, blogPosts = [] }: NavbarProps
         </>
       )}
     </nav>
-  )
-}
-
-interface NavChevronProps {
-  open: boolean
-}
-
-/**
- * Animated chevron matching the exact geometry of the emcn ChevronDown SVG.
- * Each arm rotates around its midpoint so the center vertex travels up/down
- * while the outer endpoints adjust — producing a Stripe-style morph.
- */
-function NavChevron({ open }: NavChevronProps) {
-  return (
-    <svg width='9' height='6' viewBox='0 0 10 6' fill='none' className='mt-[1.5px] flex-shrink-0'>
-      <line
-        x1='1'
-        y1='1'
-        x2='5'
-        y2='5'
-        stroke='currentColor'
-        strokeWidth='1.33'
-        strokeLinecap='square'
-        style={{
-          transformOrigin: '3px 3px',
-          transform: open ? 'rotate(-90deg)' : 'rotate(0deg)',
-          transition: 'transform 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      />
-      <line
-        x1='5'
-        y1='5'
-        x2='9'
-        y2='1'
-        stroke='currentColor'
-        strokeWidth='1.33'
-        strokeLinecap='square'
-        style={{
-          transformOrigin: '7px 3px',
-          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      />
-    </svg>
   )
 }
 
@@ -435,26 +273,6 @@ function MobileMenuIcon({ open }: { open: boolean }) {
         stroke='currentColor'
         strokeWidth='1.5'
         strokeLinecap='round'
-      />
-    </svg>
-  )
-}
-
-function ExternalArrowIcon() {
-  return (
-    <svg
-      width='12'
-      height='12'
-      viewBox='0 0 12 12'
-      fill='none'
-      className='text-[var(--landing-text-secondary)]'
-    >
-      <path
-        d='M3.5 2.5H9.5V8.5M9 3L3 9'
-        stroke='currentColor'
-        strokeWidth='1.2'
-        strokeLinecap='round'
-        strokeLinejoin='round'
       />
     </svg>
   )

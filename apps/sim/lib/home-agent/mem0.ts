@@ -60,7 +60,7 @@ export async function searchMemories(userId: string, query: string): Promise<str
     if (facts.length === 0) return ''
 
     logger.info('Retrieved memories from mem0', { userId, factCount: facts.length })
-    return facts.map((f: string) => `- ${f}`).join('\n')
+    return facts.filter((f): f is string => typeof f === 'string').map((f) => `- ${f}`).join('\n')
   } catch (err) {
     logger.error('Failed to search mem0:', err)
     return ''

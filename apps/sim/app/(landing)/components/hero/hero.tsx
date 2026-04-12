@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { DemoRequestModal } from '@/app/(landing)/components/demo-request/demo-request-modal'
 import { trackLandingCta } from '@/app/(landing)/landing-analytics'
 
 const LandingPreview = dynamic(
@@ -16,7 +15,6 @@ const LandingPreview = dynamic(
   }
 )
 
-/** Shared base classes for CTA link buttons — matches Deploy/Run button styling in the preview panel. */
 const CTA_BASE =
   'inline-flex items-center h-[32px] rounded-[5px] border px-2.5 font-[430] font-season text-sm'
 
@@ -30,11 +28,10 @@ export default function Hero() {
       className='relative flex flex-col items-center overflow-hidden bg-[var(--landing-bg)] pt-[60px] lg:pt-[100px]'
     >
       <p className='sr-only'>
-        Sim is an open-source AI agent platform. Sim lets teams build AI agents and run an agentic
-        workforce by connecting 1,000+ integrations and LLMs — including OpenAI, Anthropic Claude,
-        Google Gemini, Mistral, and xAI Grok — to deploy and orchestrate agentic workflows. Users
-        create agents, workflows, knowledge bases, tables, and docs. Sim is trusted by over 100,000
-        builders at startups and Fortune 500 companies. Sim is SOC2 compliant.
+        Neato_Pilot is a hosted AI agent platform. Build intelligent agents that connect your tools,
+        automate your workflows, and work around the clock. Connect 190+ integrations and LLMs
+        including OpenAI, Anthropic Claude, Google Gemini, Mistral, and xAI Grok to deploy and
+        orchestrate agentic workflows.
       </p>
 
       <div className='relative z-10 flex flex-col items-center gap-3'>
@@ -43,32 +40,21 @@ export default function Hero() {
           itemProp='name'
           className='text-balance font-[430] font-season text-[36px] text-white leading-[100%] tracking-[-0.02em] sm:text-[48px] lg:text-[72px]'
         >
-          Build AI Agents
+          Your AI Workforce, Ready to Deploy
         </h1>
         <p
           itemProp='description'
-          className='whitespace-nowrap text-center font-[430] font-season text-[4.4vw] text-[color-mix(in_srgb,var(--landing-text-subtle)_60%,transparent)] leading-[125%] tracking-[0.02em] sm:whitespace-normal sm:text-lg lg:text-xl'
+          className='max-w-2xl text-center font-[430] font-season text-[4.4vw] text-[color-mix(in_srgb,var(--landing-text-subtle)_60%,transparent)] leading-[125%] tracking-[0.02em] sm:text-lg lg:text-xl'
         >
-          Sim is the AI Workspace for Agent Builders
+          Build intelligent agents that connect your tools, automate your workflows, and work around
+          the clock
         </p>
 
         <div className='mt-3 flex items-center gap-2'>
-          <DemoRequestModal theme='light'>
-            <button
-              type='button'
-              className={`${CTA_BASE} border-[var(--landing-border-strong)] bg-transparent text-[var(--landing-text)] transition-colors hover:bg-[var(--landing-bg-elevated)]`}
-              aria-label='Get a demo'
-              onClick={() =>
-                trackLandingCta({ label: 'Get a demo', section: 'hero', destination: 'demo_modal' })
-              }
-            >
-              Get a demo
-            </button>
-          </DemoRequestModal>
           <Link
             href='/signup'
             className={`${CTA_BASE} gap-2 border-white bg-white text-black transition-colors hover:border-[#E0E0E0] hover:bg-[#E0E0E0]`}
-            aria-label='Get started with Sim'
+            aria-label='Get started with Neato_Pilot'
             onClick={() =>
               trackLandingCta({ label: 'Get started', section: 'hero', destination: '/signup' })
             }

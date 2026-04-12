@@ -29,11 +29,11 @@ function handleRootPathRedirects(
   }
 
   if (!isHosted) {
-    // Self-hosted: Always redirect based on session
+    // Self-hosted: Redirect authenticated users to workspace, show landing page otherwise
     if (hasActiveSession) {
       return NextResponse.redirect(new URL('/workspace', request.url))
     }
-    return NextResponse.redirect(new URL('/login', request.url))
+    return null
   }
 
   // For root path, redirect authenticated users to workspace

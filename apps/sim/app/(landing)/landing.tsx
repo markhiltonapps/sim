@@ -1,17 +1,19 @@
-import { getNavBlogPosts } from '@/lib/blog/registry'
 import { martianMono } from '@/app/_styles/fonts/martian-mono/martian-mono'
 import { season } from '@/app/_styles/fonts/season/season'
 import {
   Collaboration,
-  // Enterprise,
+  Comparison,
+  FAQ,
   Features,
   Footer,
   Hero,
+  HowItWorks,
+  Integrations,
   Navbar,
   Pricing,
   StructuredData,
   Templates,
-  Testimonials,
+  UseCases,
 } from '@/app/(landing)/components'
 import { LandingAnalytics } from '@/app/(landing)/landing-analytics'
 
@@ -30,12 +32,10 @@ import { LandingAnalytics } from '@/app/(landing)/landing-analytics'
  *   for immediate availability to AI crawlers.
  * - Section `id` attributes serve as fragment anchors for precise AI citations.
  * - Content ordering prioritizes answer-first patterns: definition (Hero) ->
- *   examples (Templates) -> capabilities (Features) -> social proof (Collaboration) ->
- *   enterprise (Enterprise) -> pricing (Pricing) -> testimonials (Testimonials).
+ *   examples (Templates) -> use cases -> how it works -> capabilities (Features) ->
+ *   integrations -> social proof (Collaboration) -> comparison -> pricing -> FAQ.
  */
-export default async function Landing() {
-  const blogPosts = await getNavBlogPosts()
-
+export default function Landing() {
   return (
     <div
       className={`${season.variable} ${martianMono.variable} min-h-screen bg-[var(--landing-bg)]`}
@@ -49,22 +49,25 @@ export default async function Landing() {
       <LandingAnalytics />
       <StructuredData />
       <header>
-        <Navbar blogPosts={blogPosts} />
+        <Navbar />
       </header>
       <main id='main-content'>
         <article itemScope itemType='https://schema.org/WebPage'>
-          <meta itemProp='name' content='Sim — Build AI Agents & Run Your Agentic Workforce' />
+          <meta itemProp='name' content='Neato_Pilot — Your AI Workforce, Ready to Deploy' />
           <meta
             itemProp='description'
-            content='Sim is the open-source platform to build AI agents and run your agentic workforce.'
+            content='Neato_Pilot is the hosted AI agent platform to build, deploy, and run intelligent workflows connecting 190+ integrations and the best LLMs.'
           />
           <Hero />
           <Templates />
+          <UseCases />
+          <HowItWorks />
           <Features />
+          <Integrations />
           <Collaboration />
-          {/* <Enterprise /> */}
+          <Comparison />
           <Pricing />
-          <Testimonials />
+          <FAQ />
         </article>
       </main>
       <Footer />

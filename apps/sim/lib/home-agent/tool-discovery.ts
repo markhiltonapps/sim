@@ -174,7 +174,9 @@ export async function discoverNangoCredentials(
     .where(and(eq(credential.workspaceId, workspaceId), eq(credential.type, 'nango')))
     .orderBy(desc(credential.createdAt))
 
-  return rows.filter((r): r is DiscoveredCredential => Boolean(r.providerId))
+  return rows
+    .filter((r) => Boolean(r.providerId))
+    .map((r) => ({ ...r, providerId: r.providerId as string }))
 }
 
 /**
