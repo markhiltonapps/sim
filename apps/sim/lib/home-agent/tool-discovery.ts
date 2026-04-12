@@ -5,6 +5,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import type { ToolInput } from '@/executor/handlers/agent/types'
 import { getNangoToken } from '@/app/api/auth/oauth/utils'
 import { getComposioClient } from '@/lib/composio/client'
+import { env } from '@/lib/core/config/env'
 import { getNangoClient } from '@/lib/nango/client'
 import { getNangoProviderConfigKey } from '@/lib/nango/providers'
 
@@ -381,20 +382,29 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
       const providerTools = PROVIDER_TOOLS[providerId]
       if (!providerTools) continue
 
-      // Extract access token from Composio connectionParams
+      // Fetch a refreshed access token via Composio's /info endpoint.
+      // The public SDK only exposes stale connectionParams; the /info
+      // endpoint triggers a server-side token refresh and returns current credentials.
       let accessToken: string | undefined
       try {
-        const detail = await composio.connectedAccounts.get({
-          connectedAccountId: conn.id,
-        })
-        const params = (detail as Record<string, unknown>).connectionParams as
-          | Record<string, unknown>
-          | undefined
-        accessToken =
-          (params?.access_token as string) ||
-          (params?.accessToken as string) ||
-          (params?.token as string) ||
-          undefined
+        const resp = await fetch(
+          `https://backend.composio.dev/api/v1/connectedAccounts/${conn.id}/info`,
+          { headers: { 'x-api-key': env.COMPOSIO_API_KEY! } }
+        )
+        if (resp.ok) {
+          const info = (await resp.json()) as Record<string, unknown>
+          // The /info response nests credentials under different shapes
+          const headers = info.headers as Record<string, string> | undefined
+          const params = info.connectionParams as Record<string, unknown> | undefined
+          accessToken =
+            headers?.Authorization?.replace(/^Bearer\s+/i, '') ||
+            (params?.access_token as string) ||
+            (params?.accessToken as string) ||
+            (params?.token as string) ||
+            undefined
+        } else {
+          logger.warn(`Composio /info returned ${resp.status} for ${appName} (${conn.id})`)
+        }
       } catch (err) {
         logger.warn(`Failed to get Composio token for ${appName} (${conn.id})`, err)
       }
