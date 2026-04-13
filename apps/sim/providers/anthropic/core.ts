@@ -296,9 +296,10 @@ export async function executeAnthropicProviderRequest(
     }
   }
 
-  console.error(`[AnthropicCore] system prompt length=${systemPrompt.length}, first 300 chars: ${systemPrompt.substring(0, 300)}`)
-  console.error(`[AnthropicCore] messages count=${messages.length}, roles=${messages.map((m) => m.role).join(',')}`)
-  console.error(`[AnthropicCore] tools count=${anthropicTools?.length ?? 0}, names=${(anthropicTools || []).map((t) => t.name).slice(0, 10).join(',')}`)
+  console.error(`[AnthropicCore] system prompt length=${systemPrompt.length}, has Gmail=${systemPrompt.includes('Gmail')}, has CURRENTLY CONNECTED=${systemPrompt.includes('CURRENTLY CONNECTED')}`)
+  console.error(`[AnthropicCore] ALL tool names: ${(anthropicTools || []).map((t) => t.name).join(', ')}`)
+  const gmailTools = (anthropicTools || []).filter((t) => t.name.includes('gmail'))
+  console.error(`[AnthropicCore] Gmail tools: ${gmailTools.length} — ${gmailTools.map((t) => t.name).join(', ')}`)
 
   const payload: AnthropicPayload = {
     model: request.model,
