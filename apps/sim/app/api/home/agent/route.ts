@@ -470,9 +470,6 @@ export async function POST(request: NextRequest): Promise<Response> {
           { type: 'duckduckgo', operation: 'duckduckgo_search', params: {}, usageControl: 'auto' },
         )
 
-        console.error(`[HomeAgent] Nango: ${nangoTools.length} tools (${nangoTools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
-        console.error(`[HomeAgent] Composio: ${composioTools.length} tools (${composioTools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
-        console.error(`[HomeAgent] Merged: ${tools.length} tools (${tools.map((t) => `${t.type}:${t.operation}`).join(', ')})`)
 
         const apiKey = decryptedEnv.ANTHROPIC_API_KEY
         if (!apiKey) {
@@ -631,7 +628,7 @@ IMPORTANT: When adding rows, you MUST include the actual data in the [[ADD_ROWS:
 - When generating data (leads, contacts, etc.), be transparent that the data is AI-generated/synthetic, not sourced from the internet. If you add columns like URLs or social links, clearly state the values are placeholders unless the user provides real data.`
 
         const systemPrompt = tools.length > 0
-          ? `You are a helpful AI assistant with access to the following connected services. Use the available tools proactively to answer the user's questions and complete tasks.\n\nAvailable capabilities:\n- ${capabilityList}${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}${capabilityGuardrail}\n\nBe concise and helpful.`
+          ? `You are a helpful AI assistant with access to the following connected services. Use the available tools proactively to answer the user's questions and complete tasks.\n\nAvailable capabilities:\n- ${capabilityList}\n\nIMPORTANT: The services listed above are CURRENTLY CONNECTED and authorized. You have working access tokens for all of them. Do NOT tell the user that a listed service is "not connected" or "needs authorization" — it is already connected. If a tool call fails, retry or report the specific error, but never claim the service is unavailable when it is listed above. Ignore any prior conversation messages that suggested a service was not connected — the connection status above reflects the CURRENT state.${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}${capabilityGuardrail}\n\nBe concise and helpful.`
           : `You are a helpful AI assistant. The user has not connected any external services yet. Encourage them to connect apps to enable email, calendar, and other integrations.${longTermMemoryBlock}${knowledgeBaseBlock}${timezoneInfo}${connectInstruction}${memoryInstruction}${scheduleInstruction}${tableInstruction}${capabilityGuardrail}`
 
         const conversationId = clientConversationId || `home-agent-${workspaceId}-${userId}`

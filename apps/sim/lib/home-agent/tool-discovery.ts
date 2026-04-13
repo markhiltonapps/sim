@@ -358,16 +358,16 @@ export function credentialsToToolInputs(
  */
 export async function discoverComposioTools(userId: string): Promise<ToolInput[]> {
   if (!env.COMPOSIO_API_KEY) {
-    console.error('[ToolDiscovery] No COMPOSIO_API_KEY, skipping')
+    logger.info('[ToolDiscovery] No COMPOSIO_API_KEY, skipping')
     return []
   }
 
   try {
     const url = `https://backend.composio.dev/api/v1/connectedAccounts?user_uuid=${encodeURIComponent(userId)}`
-    console.error(`[ToolDiscovery] Fetching Composio connections for ${userId}`)
+    logger.info(`[ToolDiscovery] Fetching Composio connections for ${userId}`)
     const resp = await fetch(url, { headers: { 'x-api-key': env.COMPOSIO_API_KEY } })
     if (!resp.ok) {
-      console.error(`[ToolDiscovery] Composio API returned ${resp.status}`)
+      logger.info(`[ToolDiscovery] Composio API returned ${resp.status}`)
       return []
     }
 
@@ -385,7 +385,7 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
     const activeConnections = (data.items || []).filter(
       (c) => c.status === 'ACTIVE' && !c.isDisabled
     )
-    console.error(`[ToolDiscovery] Found ${activeConnections.length} active Composio connections: ${activeConnections.map((c) => c.appName).join(', ')}`)
+    logger.info(`[ToolDiscovery] Found ${activeConnections.length} active Composio connections: ${activeConnections.map((c) => c.appName).join(', ')}`)
 
     if (activeConnections.length === 0) return []
 
@@ -396,7 +396,7 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
       const appName = (conn.appName || conn.appUniqueId || '').toLowerCase()
       const providerId = COMPOSIO_APP_TO_PROVIDER[appName]
       if (!providerId) {
-        console.error(`[ToolDiscovery] No provider mapping for app: ${appName}`)
+        logger.info(`[ToolDiscovery] No provider mapping for app: ${appName}`)
         continue
       }
       if (seenProviders.has(providerId)) continue
@@ -404,7 +404,7 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
 
       const providerTools = PROVIDER_TOOLS[providerId]
       if (!providerTools) {
-        console.error(`[ToolDiscovery] No PROVIDER_TOOLS for: ${providerId}`)
+        logger.info(`[ToolDiscovery] No PROVIDER_TOOLS for: ${providerId}`)
         continue
       }
 
@@ -416,7 +416,7 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
         undefined
 
       if (!accessToken) {
-        console.error(`[ToolDiscovery] No access token for ${appName} (${conn.id}), keys: ${Object.keys(params || {}).join(',')}`)
+        logger.warn(`[ToolDiscovery] No access token for ${appName} (${conn.id})`)
         continue
       }
 
@@ -429,13 +429,13 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
         })
       }
 
-      console.error(`[ToolDiscovery] Added ${providerTools.length} tools for ${appName} (provider: ${providerId})`)
+      logger.info(`[ToolDiscovery] Added ${providerTools.length} tools for ${appName} (provider: ${providerId})`)
     }
 
-    console.error(`[ToolDiscovery] Total Composio tools: ${tools.length}`)
+    logger.info(`[ToolDiscovery] Total Composio tools: ${tools.length}`)
     return tools
   } catch (error) {
-    console.error('[ToolDiscovery] Failed to discover Composio tools:', error)
+    logger.info('[ToolDiscovery] Failed to discover Composio tools:', error)
     return []
   }
 }

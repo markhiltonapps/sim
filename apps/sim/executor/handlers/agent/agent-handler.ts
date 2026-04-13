@@ -206,7 +206,6 @@ export class AgentBlockHandler implements BlockHandler {
       }
     }
 
-    console.error(`[formatTools] Processing ${otherTools.length} tools: ${otherTools.map((t) => `${t.type}:${t.operation}`).join(', ')}`)
     const otherResults = await Promise.all(
       otherTools.map(async (tool) => {
         try {
@@ -216,19 +215,12 @@ export class AgentBlockHandler implements BlockHandler {
           if (tool.type === 'custom-tool' && (tool.schema || tool.customToolId)) {
             return await this.createCustomTool(ctx, tool)
           }
-          const result = await this.transformBlockTool(ctx, tool, canonicalModes)
-          if (!result) {
-            console.error(`[formatTools] transformBlockTool returned null for ${tool.type}:${tool.operation}`)
-          }
-          return result
+          return await this.transformBlockTool(ctx, tool, canonicalModes)
         } catch (error) {
-          console.error(`[formatTools] Error for ${tool.type}:${tool.operation}:`, error)
           return null
         }
       })
     )
-    const successCount = otherResults.filter(Boolean).length
-    console.error(`[formatTools] Transformed: ${successCount}/${otherResults.length} succeeded`)
 
     const mcpResults = await this.processMcpToolsBatched(ctx, mcpTools)
 
