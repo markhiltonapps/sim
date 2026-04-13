@@ -296,6 +296,10 @@ export async function executeAnthropicProviderRequest(
     }
   }
 
+  console.error(`[AnthropicCore] system prompt length=${systemPrompt.length}, first 300 chars: ${systemPrompt.substring(0, 300)}`)
+  console.error(`[AnthropicCore] messages count=${messages.length}, roles=${messages.map((m) => m.role).join(',')}`)
+  console.error(`[AnthropicCore] tools count=${anthropicTools?.length ?? 0}, names=${(anthropicTools || []).map((t) => t.name).slice(0, 10).join(',')}`)
+
   const payload: AnthropicPayload = {
     model: request.model,
     messages,
