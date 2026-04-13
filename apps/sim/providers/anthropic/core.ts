@@ -197,7 +197,15 @@ export async function executeAnthropicProviderRequest(
 
   if (request.messages) {
     request.messages.forEach((msg) => {
-      if (msg.role === 'function') {
+      if (msg.role === 'system') {
+        // System messages belong in the system parameter, not in the messages array.
+        // The Anthropic API has a dedicated `system` field — placing system content
+        // in the messages array as a user message causes the model to treat it as
+        // conversational context rather than authoritative instructions.
+        systemPrompt = systemPrompt
+          ? `${systemPrompt}\n\n${msg.content}`
+          : (msg.content || '')
+      } else if (msg.role === 'function') {
         messages.push({
           role: 'user',
           content: [
