@@ -408,12 +408,39 @@ export async function discoverComposioTools(userId: string): Promise<ToolInput[]
         continue
       }
 
-      const params = conn.connectionParams
-      const accessToken =
-        (params?.access_token as string) ||
-        (params?.accessToken as string) ||
-        (params?.token as string) ||
-        undefined
+      // Fetch the individual connection to trigger token refresh.
+      // The list endpoint returns stale tokens; the detail endpoint
+      // triggers Composio's OAuth refresh flow for expired tokens.
+      let accessToken: string | undefined
+      try {
+        const detailResp = await fetch(
+          `https://backend.composio.dev/api/v1/connectedAccounts/${conn.id}`,
+          { headers: { 'x-api-key': env.COMPOSIO_API_KEY } }
+        )
+        if (detailResp.ok) {
+          const detail = (await detailResp.json()) as {
+            connectionParams?: Record<string, unknown>
+          }
+          const params = detail.connectionParams
+          accessToken =
+            (params?.access_token as string) ||
+            (params?.accessToken as string) ||
+            (params?.token as string) ||
+            undefined
+        }
+      } catch (err) {
+        logger.warn(`[ToolDiscovery] Failed to fetch fresh token for ${appName} (${conn.id})`)
+      }
+
+      // Fall back to token from the list response
+      if (!accessToken) {
+        const params = conn.connectionParams
+        accessToken =
+          (params?.access_token as string) ||
+          (params?.accessToken as string) ||
+          (params?.token as string) ||
+          undefined
+      }
 
       if (!accessToken) {
         logger.warn(`[ToolDiscovery] No access token for ${appName} (${conn.id})`)
